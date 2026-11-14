@@ -59,6 +59,14 @@ const path = require('path');
   const ic = await (await p.$('#fview .fi')).boundingBox(); await touch('touchStart', ic.x + ic.width / 2, ic.y + 20); await wait(620); await touch('touchEnd'); await wait(450);
   expect((await st()).lift && !!(await p.$('#liftItem.fi img')), 'holding an icon lifts the icon'); await shot('06b-folder-icon-held');
   await touch('touchStart', 30, 80); await touch('touchEnd'); await wait(300);
+  expect(!(await p.$('#fview [data-addto]')), 'no Add tile among the icons');
+  const fn = await (await p.$('#fview .fname')).boundingBox(); await touch('touchStart', fn.x + 20, fn.y + 14); await wait(620); await touch('touchEnd'); await wait(450);
+  const mi = await p.$$eval('#liftMenu .mi span:first-child', (e) => e.map((x) => x.textContent));
+  expect((await st()).lift && mi[0] === 'Add apps', 'hold the folder name → Add apps (' + mi + ')'); await shot('06c-folder-title-held');
+  await tapEl('#liftMenu [data-lift="a"]'); await settle(); await wait(200);
+  expect((await st()).sheet && (await st()).kind === 'picker' && (await st()).folder === -1, 'Add apps opens the picker');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  if ((await st()).folder !== 1) { await tapEl('[data-tile="1"]'); await settle(); }
   const fv = await (await p.$('#fview .fhead')).boundingBox();
   await swipe(fv.x + 40, fv.y + 10, fv.x + 40, fv.y + 320, 200);
   expect((await st()).folder === -1, 'drag folder down closes it');

@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.5.0';
+  const PAGE_VERSION = '0.5.1';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -586,9 +586,9 @@
     const tile = document.querySelector('[data-tile="' + i + '"]');
     const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
     const v = $('#fview');
-    v.innerHTML = '<div class="fhead"><span class="fname">' + esc(f.name) + '</span><span class="mono">' + apps.length + (apps.length === 1 ? ' app' : ' apps') + '</span></div>' +
+    v.innerHTML = '<div class="fhead"><span class="fname"' + (f.auto ? '' : ' data-hold="foldtitle:' + i + '"') + '>' + esc(f.name) + '</span><span class="mono">' + apps.length + (apps.length === 1 ? ' app' : ' apps') + '</span></div>' +
       '<div class="fbody scroll"><div class="ficons">' + apps.map((a) => '<button class="fi" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + appIcon(a) + '<span class="fil">' + esc(shortName(a.label)) + '</span></button>').join('') +
-      (f.auto ? '' : '<button class="fi" data-addto="' + i + '"><span class="fic add">' + ICON.plus + '</span><span class="fil">' + (apps.length ? 'Add' : 'Add apps') + '</span></button>') + '</div></div>';
+      '</div>' + (!apps.length && !f.auto ? '<p class="hint" style="margin:0 0 14px">Empty. Hold the name to add apps.</p>' : '') + '</div>';
     folderOpen = i;
     $('#fwrap').classList.add('on');
     v.style.transform = '';
@@ -790,6 +790,15 @@
   function onHold(el) {
     const h = el.dataset.hold || '';
     if (h === 'clock' || h === 'paper-settings') return openSettings();
+    if (h.startsWith('foldtitle:')) {
+      // holding an open folder's name: add apps, rename, delete
+      const i = +h.split(':')[1];
+      return lift(el, [
+        { id: 'a', label: 'Add apps', run: () => { closeFolder(true); openPicker({ fold: i }); } },
+        { id: 'r', label: 'Rename', run: () => { closeFolder(true); folderSheet(i); } },
+        { id: 'd', label: 'Delete folder', red: true, run: () => { closeFolder(true); S.folders.splice(i, 1); save(); renderFolders(); toast('Folder deleted'); } }
+      ]);
+    }
     if (h.startsWith('folder:')) {
       const i = +h.split(':')[1];
       return lift(el.querySelector('.tname') || el, [

@@ -40,7 +40,7 @@ Neither is on any page. Swipe down and type the name.
 
 ## Folders
 
-On the Folders page each folder shows the names of its first apps. Open one and the apps are icons, with their names underneath. Hold an icon for its menu.
+On the Folders page each folder shows the names of its first apps. Open one and the apps are icons, with their names underneath. Hold an icon for its menu; hold the folder's name to add apps, rename or delete it.
 
 ## Changing things
 
