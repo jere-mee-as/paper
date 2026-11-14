@@ -19,7 +19,8 @@
 | Swipe down from the very top edge | The phone's own notifications |
 | Swipe up | Now |
 | Slide along the letters on the right edge | A card of that letter's apps follows your finger. Slide onto an app and let go to open it, or let go on the rail and tap one |
-| Hold an app | Open, remove from Home, put in folders, app info, uninstall |
+| Tap or drag along the dots at the bottom | Jump or scrub between Calendar, Home and Folders |
+| Hold an app | It lifts and a menu springs out: open, remove from Home, move to folder, app info, uninstall |
 | Hold the clock, or hold Settings on Now | Paper's settings |
 
 Back always returns home. Unfolded, Calendar, Home and Folders show side by side.
@@ -27,7 +28,7 @@ Back always returns home. Unfolded, Calendar, Home and Folders show side by side
 ## Changing things
 
 - **Home apps**: Settings → Edit home apps, or hold an app on Home. An app shown crossed out wasn't found on the phone: hold it and tap *Choose the app*.
-- **Folders**: open a folder and tap **+ Add** to tick apps in or out. Hold a folder's name to rename, move up or delete it. Settings → New folder adds one. Settings → Re-sort folders refills them from app names.
+- **Folders**: open a folder tile and tap **+ Add** to tick apps in or out. Hold a tile to rename or delete it. Drag an open folder down to close it. Settings → New folder adds one. Settings → Re-sort folders refills them from app names.
 - **Modes**: type `jere mode` or `plain mode` in search, or use Settings → Mode.
 
 Everything you change is saved on the phone and survives updates.
