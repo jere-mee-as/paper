@@ -1,0 +1,43 @@
+<div id="app">
+  <div id="track">
+    <section class="page" id="pCal" aria-label="Calendar">
+      <h1>Next 7 days</h1>
+      <div class="days scroll" id="days"></div>
+      <div class="calfoot"><button class="fab" id="addEv" aria-label="Add event"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1918" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    </section>
+
+    <section class="page" id="pHome" aria-label="Home">
+      <div class="clockrow">
+        <p id="clock" role="button" aria-label="Time. Hold for settings"></p>
+        <p class="mono" id="date" style="margin:0"></p>
+      </div>
+      <div class="cols" id="cols">
+        <nav class="col" aria-label="People apps"><p class="mono">People</p><div id="colPeople"></div></nav>
+        <nav class="col" aria-label="Things apps"><p class="mono">Things</p><div id="colThings"></div></nav>
+      </div>
+      <div class="scroll" id="plainList" hidden></div>
+      <nav id="rail" aria-label="Alphabet"></nav>
+    </section>
+
+    <section class="page" id="pFold" aria-label="Folders">
+      <h1>Folders</h1>
+      <div class="folds scroll" id="folds"></div>
+    </section>
+  </div>
+
+  <section class="over" id="search" aria-label="Search">
+    <label class="qwrap"><span class="mono" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Search or ask</span>
+      <input id="q" type="text" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go"></label>
+    <div id="results" class="scroll"></div>
+  </section>
+
+  <section class="over" id="now" aria-label="Now">
+    <h1>Now</h1>
+    <div class="nowlist scroll" id="nowlist"></div>
+    <div class="toggles" id="toggles"></div>
+  </section>
+
+  <div id="scrim"></div>
+  <div id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="sbody" id="sbody"></div></div>
+  <div id="toast" role="status"></div>
+</div>

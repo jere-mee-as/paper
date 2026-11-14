@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Behind the system bars until the page reports its own colours -->
+    <color name="bg">#ffece9e2</color>
+    <!-- App icon: bone field, ink mark -->
+    <color name="icon_bg">#ffece9e2</color>
+    <color name="icon_ink">#ff171614</color>
+</resources>
