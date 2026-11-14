@@ -38,6 +38,10 @@ Neither is on any page. Swipe down and type the name.
   - **Patterns** go over any color, Soft or Bold: Tablet, Dots, Graph, Blueprint, Hatch, Ripples, Dunes, Stars, Terrazzo, Maze, Crosses, Confetti, Memphis, Stripes, Gingham.
   - **Surprise me** picks at random; **Back to Paper** undoes everything. Typing a color's name (`lapis`) applies it directly.
 
+## Messages (on Now)
+
+Tap a message to open it. Swipe it right to clear it.
+
 ## The player (on Now)
 
 Shows the album art, the song, the artist and album, and which app is playing it. Drag along the bar to jump anywhere in the track. Tap the artwork to open the app.

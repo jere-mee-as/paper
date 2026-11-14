@@ -103,6 +103,25 @@ const path = require('path');
   await tapEl('#nowlist [data-media="next"]'); await wait(700);
   expect((await p.$eval('#nowlist .mcard .ti', (e) => e.textContent)) === 'Night drive, side A', 'next track');
   await tapEl('#nowlist [data-media="toggle"]'); await wait(800); await shot('09c-now-player');
+  // notifications: no buttons; tap opens; swipe right clears; a short drag springs back; vertical still closes Now
+  await p.evaluate(() => { window.__opened = []; const f = PaperNative.notifOpen; PaperNative.notifOpen = (id) => { __opened.push(id); return f(id); }; });
+  expect(!(await p.$('#nowlist [data-reply], #nowlist [data-clear]')), 'no Reply / Clear buttons');
+  const nc = () => p.$$eval('#nowlist .ncard', (e) => e.map((x) => x.dataset.nid));
+  const n0 = await nc(); expect(n0.length >= 2, 'messages on Now (' + n0 + ')');
+  let nb = await (await p.$('#nowlist .ncard')).boundingBox();
+  await touch('touchStart', nb.x + 60, nb.y + nb.height / 2); await wait(60); await touch('touchEnd'); await wait(200);
+  expect((await p.evaluate(() => __opened))[0] === n0[0], 'tap opens the message');
+  nb = await (await p.$('#nowlist .ncard')).boundingBox();
+  await swipe(nb.x + 40, nb.y + nb.height / 2, nb.x + 100, nb.y + nb.height / 2, 400, 8); await wait(400);
+  expect((await nc()).length === n0.length && (await p.$eval('#nowlist .ncard', (e) => e.style.transform)) === '', 'short slow drag springs back');
+  await touch('touchStart', nb.x + 40, nb.y + nb.height / 2); for (let i = 1; i <= 6; i++) { await touch('touchMove', nb.x + 40 + i * 22, nb.y + nb.height / 2 + 2); await wait(16); }
+  await shot('09d-now-swiping-notif'); await touch('touchEnd'); await wait(900);
+  const n1 = await nc(); expect(n1.length === n0.length - 1 && !n1.includes(n0[0]) && (await st()).over === 'now', 'swipe right clears it (' + n1 + ')');
+  expect((await p.evaluate(() => __opened)).length === 1, 'and does not open it');
+  await shot('09e-now-after-clear');
+  nb = await (await p.$('#nowlist .ncard')).boundingBox();
+  await swipe(nb.x + 80, nb.y + 20, nb.x + 84, nb.y + 360, 220, 10); expect((await st()).over === '', 'pull down starting on a message still closes Now');
+  await swipe(180, 700, 180, 400, 200); expect((await st()).over === 'now', 'back to Now');
   await swipe(180, 200, 180, 600, 200); expect((await st()).over === '', 'swipe down closes now');
   // rail
   const rail = await (await p.$('#rail')).boundingBox();

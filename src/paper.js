@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.6.0';
+  const PAGE_VERSION = '0.6.1';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -213,6 +213,7 @@
   function gStart(x, y, target) {
     if (toyOpen) { G = null; return; }
     if (target.closest('#rail')) { railStart(y, x); G = { rail: true }; return; }
+    if (over === 'now' && target.closest('.ncard')) { G = { notif: target.closest('.ncard'), x, y, target, pts: [[performance.now(), x]] }; startHold(target); return; }
     if (target.closest('.seek')) { G = { seek: true }; seeking = true; target.closest('.mcard').classList.add('seeking'); seekAt(x); haptic('tick'); return; }
     if (target.closest('#dots')) { G = { dots: true, x, y, moved: false, pts: [[performance.now(), x]] }; stopSpring('hx'); dotsAt(x); return; }
     if (liftOpen) { if (!target.closest('#liftMenu')) { closeLift(); G = { eat: true }; } return; }
@@ -244,6 +245,23 @@
     if (!G) return false;
     if (G.rail) { railMove(y, x); return true; }
     if (G.seek) { seekAt(x); return true; }
+    if (G.notif) {
+      const dx = x - G.x, dy = y - G.y;
+      if (!G.axis) {
+        if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return false;
+        cancelHold();
+        if (Math.abs(dy) > Math.abs(dx)) {   // vertical: behave like any other touch on Now (scroll the list, or pull down to close)
+          const s0 = G; G = { x: s0.x, y: s0.y, target: s0.target, sc: scroller(s0.target), axis: '', mode: '', hx0: hx, tS0: tS, tN0: tN, caught: false, pts: [[performance.now(), s0.x, s0.y]] };
+          return gMove(x, y);
+        }
+        G.axis = 'h'; G.notif.style.transition = 'none';
+      }
+      G.pts.push([performance.now(), x]); if (G.pts.length > 6) G.pts.shift();
+      const off = dx > 0 ? dx : -rubber(-dx, 60);
+      G.notif.style.transform = 'translate3d(' + off + 'px,0,0)';
+      G.notif.style.opacity = String(Math.max(0.25, 1 - Math.max(0, dx) / (W() * 0.9)));
+      return true;
+    }
     if (G.eat) return true;
     if (G.dots) { G.moved = G.moved || Math.abs(x - G.x) > 6; G.pts.push([performance.now(), x]); dotsAt(x); return true; }
     if (G.sheetMaybe) {
@@ -307,6 +325,23 @@
     const s = G; G = null;
     if (!s) return;
     if (s.sheetMaybe) return;
+    if (s.notif) {
+      if (!s.axis) return;                       // a tap: the click opens it
+      suppress();
+      const el = s.notif, dx = x - s.x, v = vel(s.pts, 1);
+      el.style.transition = 'transform .32s cubic-bezier(.22,1,.36,1), opacity .32s';
+      if (dx > W() * 0.33 || (v > 600 && dx > 20)) {
+        el.style.transform = 'translate3d(' + (W() + 40) + 'px,0,0)'; el.style.opacity = '0'; haptic('tick');
+        const id = el.dataset.nid;
+        setTimeout(() => {
+          const h = el.offsetHeight; el.style.height = h + 'px'; el.style.overflow = 'hidden'; void el.offsetHeight;
+          el.style.transition = 'height .28s cubic-bezier(.22,1,.36,1), margin .28s, padding .28s';
+          el.style.height = '0px'; el.style.marginBottom = '0px'; el.style.paddingTop = '0px'; el.style.paddingBottom = '0px'; el.style.borderWidth = '0';
+          setTimeout(() => { NOTIFS = NOTIFS.filter((n) => n.id !== id); call('notifDismiss', id); }, 300);
+        }, 220);
+      } else { el.style.transform = ''; el.style.opacity = ''; }
+      return;
+    }
     if (s.seek) { seekAt(x, true); seeking = null; const c = document.querySelector('#nowlist .mcard'); if (c) c.classList.remove('seeking'); haptic('tick'); suppress(); return; }
     if (s.rail) { railEnd(x, y); suppress(); return; }
     if (s.eat) { suppress(); return; }
@@ -767,16 +802,15 @@
       const msgs = NOTIFS.filter((n) => n.canReply).sort((a, b) => b.time - a.time).filter((n) => { const k = n.pkg + '|' + (n.convo || n.title); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 3);
       msgs.forEach((n) => {
         const app = APPS.find((a) => a.pkg === n.pkg);
-        parts.push('<section class="glass card"><button class="col msg" data-notif="' + esc(n.id) + '"><span class="mono">' + esc((n.person || n.title || '') + (app ? ' · ' + app.label : '') + ' · ' + agoText(n.time)) + '</span><span class="mt">' + esc(n.text) + '</span></button>' +
-          (replyOpen === n.id ? '<form class="reply" data-send="' + esc(n.id) + '"><input type="text" placeholder="Reply" aria-label="Reply" enterkeyhint="send"><button class="btn solid sm" type="submit">Send</button></form>'
-            : '<div class="btnrow" style="margin:0"><button class="btn sm" data-reply="' + esc(n.id) + '">Reply</button><button class="btn sm" data-clear="' + esc(n.id) + '">Clear</button></div>') + '</section>');
+        // tap to open, swipe right to clear
+        parts.push('<section class="glass card ncard" data-nid="' + esc(n.id) + '"><button class="col msg" data-notif="' + esc(n.id) + '" aria-label="Open. Swipe right to clear.">' +
+          '<span class="mono">' + esc((n.person || n.title || '') + (app ? ' · ' + app.label : '') + ' · ' + agoText(n.time)) + '</span><span class="mt">' + esc(n.text) + '</span></button></section>');
       });
       if (!msgs.length && !(MEDIA && MEDIA.title) && !ev) parts.push('<section class="glass card"><span class="tx">Nothing waiting. Nothing playing.</span></section>');
     }
     $('#nowlist').innerHTML = parts.join('');
     $('#dock').innerHTML = DOCK.map(([k, label, icon]) =>
       '<button class="dk" data-dock="' + k + '"' + (k === 'settings' ? ' data-hold="paper-settings"' : '') + '><span class="di">' + icon + '</span><span class="dl">' + label + '</span></button>').join('');
-    if (replyOpen) { const i = $('.reply input'); if (i) setTimeout(() => i.focus(), 30); }
   }
   const DI = (d) => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
   const DOCK = [
@@ -1064,7 +1098,7 @@
         case 'apps': loadApps(); renderHome(); if (folderOpen < 0) renderFolders(); break;
         case 'resume': sunTick(); renderClock(); loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
         case 'perms': loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
-        case 'notifs': case 'media': if (over === 'now' && !replyOpen) renderNow(); break;
+        case 'notifs': case 'media': if (over === 'now' && !(G && G.notif)) renderNow(); break;
         case 'update': onUpdate(v); break;
       }
     },
