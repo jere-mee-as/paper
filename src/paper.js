@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.4.0';
+  const PAGE_VERSION = '0.4.1';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -215,7 +215,11 @@
     if (liftOpen) { if (!target.closest('#liftMenu')) { closeLift(); G = { eat: true }; } return; }
     if (sheetOpen) {
       const sb = $('#sbody');
-      if (target.closest('#sheet') && (target.closest('.grab') || sb.scrollTop <= 0) && !target.closest('input')) { stopSpring('sheet'); G = { sheet: true, y, y0: sheetY, pts: [[performance.now(), y]] }; }
+      // The handle always drags the sheet. Elsewhere the content scrolls; only a downward pull with the content at its top drags the sheet.
+      if (target.closest('#sheet') && !target.closest('input')) {
+        if (target.closest('.grab')) { stopSpring('sheet'); G = { sheet: true, y, y0: sheetY, pts: [[performance.now(), y]] }; }
+        else if (sb.scrollTop <= 0) G = { sheetMaybe: true, x, y };
+      }
       return;
     }
     if (folderOpen >= 0) {
@@ -238,6 +242,12 @@
     if (G.rail) { railMove(y, x); return true; }
     if (G.eat) return true;
     if (G.dots) { G.moved = G.moved || Math.abs(x - G.x) > 6; G.pts.push([performance.now(), x]); dotsAt(x); return true; }
+    if (G.sheetMaybe) {
+      const dy = y - G.y, dx = x - G.x;
+      if (Math.abs(dy) < 4 && Math.abs(dx) < 4) return false;
+      if (dy > 0 && dy > Math.abs(dx) && $('#sbody').scrollTop <= 0) { stopSpring('sheet'); G = { sheet: true, y, y0: sheetY, pts: [[performance.now(), y]] }; return true; }
+      G = null; return false;
+    }
     if (G.sheet) {
       const dy = y - G.y; G.pts.push([performance.now(), y]); if (G.pts.length > 6) G.pts.shift();
       sheetY = Math.max(0, G.y0 + dy) + (G.y0 + dy < 0 ? -rubber(-(G.y0 + dy), 120) : 0); paintSheet();
@@ -292,6 +302,7 @@
     cancelHold();
     const s = G; G = null;
     if (!s) return;
+    if (s.sheetMaybe) return;
     if (s.rail) { railEnd(x, y); suppress(); return; }
     if (s.eat) { suppress(); return; }
     if (s.dots) {
