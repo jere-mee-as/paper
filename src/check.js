@@ -97,6 +97,67 @@ const path = require('path');
   const gb = await (await p.$('#sheet .grab')).boundingBox();
   await swipe(gb.x + gb.width / 2, gb.y + gb.height / 2, gb.x + gb.width / 2, gb.y + 300, 180);
   expect(!(await st()).sheet, 'drag sheet down closes it');
+
+  // ---- 0.4.0: the hidden folders. Found only through search.
+  expect(!(await p.evaluate(() => document.body.innerText.toLowerCase())).includes('fun stuff'), 'fun stuff is not on any page');
+  const find = async (text) => { await swipe(180, 300, 180, 520, 160, 8); await p.fill('#q', text); await wait(150); };
+  await find('fun'); expect((await p.$eval('#results .row .l', (e) => e.textContent)) === 'Fun stuff', 'search "fun" finds Fun stuff'); await shot('14-search-fun');
+  await tapEl('#results .row'); await settle(); await wait(200);
+  expect((await st()).kind === 'fun', 'opens the Fun stuff folder'); await shot('15-fun-folder');
+  const toys = await p.evaluate(() => PAPER.toys());
+  expect(toys.length >= 30, 'plenty of toys (' + toys.length + ')');
+  const body = { x: 195, y: 470 };
+  for (const id of toys) {
+    await p.evaluate((t) => PAPER.openToy(t), id); await wait(260);
+    expect((await st()).toy === id, 'toy opens: ' + id);
+    expect(await p.evaluate(() => document.querySelector('#toyBody .tbox').children.length > 0 && !document.querySelector('#toyBody').innerText.includes('This one broke')), 'toy renders: ' + id);
+    for (let k = 0; k < 3; k++) { await touch('touchStart', body.x + k * 14, body.y - k * 20); await wait(40); await touch('touchEnd'); await wait(110); }
+    await touch('touchStart', 120, 420); for (let i = 1; i <= 5; i++) { await touch('touchMove', 120 + i * 30, 420 + i * 6); await wait(14); } await touch('touchEnd'); await wait(160);
+    for (const sel of ['#toyBody .trow button', '#toyBody [data-n]']) { const el = await p.$(sel); if (el) { const bb = await el.boundingBox(); if (bb) { await touch('touchStart', bb.x + bb.width / 2, bb.y + bb.height / 2); await wait(30); await touch('touchEnd'); await wait(120); } } }
+    if (['coin', 'dice', 'oracle', 'bubble', 'spinner', 'doodle', 'confetti', 'lava', 'rain', 'warp', 'life', 'snake', 'g2048', 'memory', 'simon', 'whack', 'keepy', 'rock', 'grass', 'year', 'metro', 'party'].includes(id)) { await wait(500); await shot('toy-' + id); }
+    expect(near((await st()).hx, 0) && (await st()).over === '', 'swipes inside a toy do not move the launcher: ' + id);
+  }
+  await tapEl('#toyX'); await settle(); await wait(150);
+  expect((await st()).toy === '' && (await st()).kind === 'fun', 'closing a toy returns to Fun stuff');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  // themes
+  await find('themes'); expect((await p.$eval('#results .row .l', (e) => e.textContent)) === 'Themes', 'search "themes" finds Themes');
+  await tapEl('#results .row'); await settle(); await wait(200);
+  expect((await st()).kind === 'themes', 'opens the Themes folder'); await shot('16-themes-folder');
+  const th = await p.evaluate(() => PAPER.themes());
+  const weak = th.filter((t) => t.ink < 4.5 || t.ink2 < 4.5);
+  expect(!weak.length, 'every theme keeps text readable: ' + JSON.stringify(weak));
+  expect(th.length >= 60, 'plenty of themes (' + th.length + ')');
+  const tapIn = async (sel) => { await p.evaluate((q) => document.querySelector(q).scrollIntoView({ block: 'center' }), sel); await wait(120); await tapEl(sel); };
+  await tapIn('[data-color="lapis"]'); await tapIn('#sbody [data-str="bold"]'); await tapIn('[data-pat="wedges"]'); await wait(900);
+  const t1 = (await st()).theme; expect(t1.color === 'lapis' && t1.pat === 'wedges' && t1.str === 'bold', 'tapping swatches sets the theme ' + JSON.stringify(t1));
+  await shot('17-themes-patterns');
+  expect((await p.evaluate(() => PAPER.bars()))[0] === 'rgb(22,32,122)', 'system bars follow the theme');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle(); await wait(300); await shot('18-tablet-home');
+  await swipe(330, 450, 60, 450); await shot('19-tablet-folders'); await tapEl('[data-tile="1"]'); await settle(); await shot('20-tablet-folder-open');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  await swipe(60, 450, 330, 450); await swipe(60, 450, 330, 450); await shot('21-tablet-calendar'); await swipe(330, 450, 60, 450);
+  await swipe(180, 700, 180, 400, 200); await shot('22-tablet-now'); await swipe(180, 200, 180, 600, 200);
+  await swipe(180, 300, 180, 520, 160, 8); await shot('23-tablet-search'); await swipe(180, 640, 180, 380, 140, 8);
+  // every color and every pattern applies cleanly; a sample gets photographed
+  const pats = await p.evaluate(() => PAPER.patterns());
+  for (const t of th) { await p.evaluate((id) => PAPER.setTheme({ color: id, pat: 'none', auto: false }), t.id); }
+  for (const [c, pt, s2] of [['g-ember', 'none', 'soft'], ['g-aurora', 'stars', 'bold'], ['m-green', 'none', 'soft'], ['d-purple', 'dots', 'bold'], ['cobalt', 'memphis', 'bold'], ['sun', 'stripes', 'soft'], ['blueprint', 'blueprint', 'bold'],
+    ['sand', 'terrazzo', 'bold'], ['arcade', 'maze', 'bold'], ['g-dune', 'dunes', 'bold'], ['sun-dawn', 'none', 'soft'], ['sun-dusk', 'none', 'soft'], ['sun-night', 'stars', 'bold'], ['hotpink', 'confetti', 'bold'], ['news', 'grid', 'bold'], ['terminal', 'hatch', 'soft'], ['m-red', 'gingham', 'soft'], ['mint', 'ripples', 'bold'], ['void', 'crosses', 'bold']]) {
+    await p.evaluate((a) => PAPER.setTheme({ color: a[0], pat: a[1], str: a[2], auto: false }), [c, pt, s2]); await wait(850); await shot('theme-' + c + '-' + pt);
+  }
+  for (const pt of pats) { await p.evaluate((x) => PAPER.setTheme({ pat: x }), pt); }
+  // follow the sun
+  await p.evaluate(() => PAPER.setTheme({ auto: true, pat: 'none' })); await wait(300);
+  const ph = await p.evaluate(() => PAPER.sunPhase(Date.now())); expect(['dawn', 'day', 'dusk', 'night'].includes(ph), 'sun phase ' + ph);
+  const sun = await p.evaluate(() => { const d = new Date(2026, 5, 21), t = PAPER.sunTimes(d); const f = (x) => new Date(x).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }); return [f(t.rise), f(t.set)]; });
+  expect(/^05:4[0-9]$/.test(sun[0]) && /^20:3[0-9]$/.test(sun[1]), 'solstice sunrise/sunset in Reston ≈ 05:44 / 20:39 (got ' + sun + ')');
+  await find('them'); await tapEl('#results .row'); await settle(); await shot('24-themes-sun-on');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  await find('snake'); expect((await p.$eval('#results .row .l', (e) => e.textContent)) === 'Snake', 'a toy answers by name'); await tapEl('#results .row'); await wait(400); expect((await st()).toy === 'snake', 'and opens');
+  await p.evaluate(() => PAPER.onNative('home', null)); await settle(); expect((await st()).toy === '', 'home closes a toy');
+  await p.reload(); await wait(700); expect((await st()).theme.auto === true, 'theme survives a reload');
+  await p.evaluate(() => PAPER.setTheme({ auto: false, color: 'lapis', pat: 'wedges', str: 'bold' })); await wait(800);
   // unfolded
   await p.setViewportSize({ width: 884, height: 760 }); await wait(500); await shot('13-unfolded');
   await browser.close();

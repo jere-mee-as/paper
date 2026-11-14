@@ -19,6 +19,8 @@ Calendar  ←      Home      →  Folders
 - **Jere mode** is the curated setup. **Plain mode** is every app A–Z with folders by type.
 - Unfolded on the Fold, Calendar, Home and Folders sit side by side.
 
+Two folders are hidden and found only through search: **Fun stuff** (35 toys) and **Themes** (colors, gradients, patterns, and a sky that follows the sun). Source: `src/fun.js`, `src/themes.js`.
+
 ## Install
 
 Download on the phone: **https://github.com/jere-mee-as/paper/releases/latest/download/paper.apk**

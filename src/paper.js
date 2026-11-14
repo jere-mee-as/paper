@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.3.0';
+  const PAGE_VERSION = '0.4.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -32,6 +32,8 @@
     S = { v: 1, jere: true, home: { people: PEOPLE.map(([n, a]) => ({ name: n, alias: a, key: '' })), things: THINGS.map(([n, a]) => ({ name: n, alias: a, key: '' })) },
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
+
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -88,8 +90,8 @@
     plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     prev: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg>',
     next: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>',
-    pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ECE9E2" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>',
-    play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#ECE9E2" aria-hidden="true"><path d="M8 5l12 7-12 7z"/></svg>'
+    pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="stroke:var(--bg)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>',
+    play: '<svg width="18" height="18" viewBox="0 0 24 24" style="fill:var(--bg)" aria-hidden="true"><path d="M8 5l12 7-12 7z"/></svg>'
   };
 
   // ------------------------------------------------------------------ springs
@@ -207,6 +209,7 @@
     return fingerDown ? sc.scrollTop > 0 : sc.scrollTop + sc.clientHeight < sc.scrollHeight - 1;
   }
   function gStart(x, y, target) {
+    if (toyOpen) { G = null; return; }
     if (target.closest('#rail')) { railStart(y, x); G = { rail: true }; return; }
     if (target.closest('#dots')) { G = { dots: true, x, y, moved: false, pts: [[performance.now(), x]] }; stopSpring('hx'); dotsAt(x); return; }
     if (liftOpen) { if (!target.closest('#liftMenu')) { closeLift(); G = { eat: true }; } return; }
@@ -607,6 +610,8 @@
     ['Settings', 'Paper', () => openSettings()],
     ['Update Paper', 'Paper', () => { openSettings(); checkUpdates(); }],
     ['Edit home apps', 'Paper', () => openHomeEditor()],
+    ['Fun stuff', 'Hidden', () => openFun()],
+    ['Themes', 'Hidden', () => openThemes()],
     ['Phone notifications', 'Phone', () => call('shade')],
     ['Phone settings', 'Phone', () => call('settings', '')]
   ];
@@ -618,6 +623,12 @@
     APPS.filter((a) => low(a.label).split(/[\s.\-]+/).some((x) => x.startsWith(ql)) || low(a.label).startsWith(ql))
       .forEach((a) => out.push({ n: a.label, w: whereIs(a.key), f: () => open(a.key, a.label), key: a.key }));
     folderList().forEach((f, i) => { if (low(f.name).startsWith(ql)) out.push({ n: f.name, w: 'Folder', f: () => { goPage(1); setTimeout(() => openFolder(i), 380); } }); });
+    // the hidden folders' contents answer by name too
+    if (ql.length > 2) {
+      const hit = (n) => low(n).split(/[\s\-]+/).some((x) => x.startsWith(ql));
+      TOYS.filter((t) => hit(t[1])).slice(0, 4).forEach((t) => out.push({ n: t[1], w: 'Fun', f: () => openToy(t[0]) }));
+      TH.filter((c) => hit(c.n)).slice(0, 4).forEach((c) => out.push({ n: c.n + ' theme', w: 'Theme', f: () => { setTheme({ color: c.id, auto: false }); toast(c.n); } }));
+    }
     out.push({ n: 'Search the web for “' + q + '”', w: 'Brave', f: () => call('web', q), q });
     out.push({ n: 'Find “' + q + '” on the map', w: 'Maps', f: () => call('maps', q), q, maps: true });
     return out;
@@ -792,7 +803,7 @@
     let moves = '';
     if (a && S.jere) {
       moves = '<div class="grp"><p class="mono">In folders</p>' + S.folders.map((f, i) =>
-        '<button class="pick' + (f.keys.includes(key) ? ' on' : '') + '" data-tofold="' + i + '" data-k="' + esc(key) + '"><span>' + esc(f.name) + '</span><span class="ck">' + (f.keys.includes(key) ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ECE9E2" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '') + '</span></button>').join('') + '</div>';
+        '<button class="pick' + (f.keys.includes(key) ? ' on' : '') + '" data-tofold="' + i + '" data-k="' + esc(key) + '"><span>' + esc(f.name) + '</span><span class="ck">' + (f.keys.includes(key) ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="stroke:var(--bg)" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '') + '</span></button>').join('') + '</div>';
     }
     sheetKind = 'app';
     openSheet('<h2>' + esc(label || (a && a.label) || 'App') + '</h2>' + (a && a.label !== label ? '<p class="mono" style="margin:0">' + esc(a.label) + '</p>' : '') +
@@ -815,7 +826,7 @@
     const title = p.fold != null ? 'Add to ' + S.folders[p.fold].name : 'Choose the app for this spot';
     const list = APPS.map((a) => {
       const on = p.fold != null ? S.folders[p.fold].keys.includes(a.key) : false;
-      return '<button class="pick' + (on ? ' on' : '') + '" data-pk="' + esc(a.key) + '"><span>' + esc(a.label) + '</span><span class="ck">' + (on ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ECE9E2" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '') + '</span></button>';
+      return '<button class="pick' + (on ? ' on' : '') + '" data-pk="' + esc(a.key) + '"><span>' + esc(a.label) + '</span><span class="ck">' + (on ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="stroke:var(--bg)" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '') + '</span></button>';
     }).join('');
     sheetKind = 'picker';
     openSheet('<h2>' + esc(title) + '</h2><div class="grp">' + list + '</div>' + (p.fold != null ? '<div class="btnrow" style="margin-top:16px"><button class="btn solid" data-act="close">Done</button></div>' : ''));
@@ -882,7 +893,14 @@
     const t = e.target.closest('button, form');
     if (!t) { if (e.target === $('#scrim')) closeSheet(); return; }
     if (t.closest('#lift')) return;
+    if (t.closest('#toy')) { if (t.id === 'toyX') closeToy(); return; }
     const d = t.dataset;
+    if (d.toy) { openToy(d.toy === '?' ? pickOf(TOYS)[0] : d.toy); return; }
+    if (d.color) { setTheme({ color: d.color, auto: false }); return; }
+    if (d.pat) { setTheme({ pat: d.pat }); return; }
+    if (d.str) { setTheme({ str: d.str }); return; }
+    if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false }); return; }
+    if (d.thact) { themeAct(d.thact); return; }
     if (d.open !== undefined) { open(d.open, d.label); return; }
     if (d.tile !== undefined) { openFolder(+d.tile); return; }
     if (d.recent !== undefined) { runRecent(+d.recent); return; }
@@ -963,23 +981,29 @@
   $('#clock').setAttribute('data-hold', 'clock');
   $('#scrim').addEventListener('click', () => closeSheet());
 
+/*__THEMES__*/
+/*__FUN__*/
   // ------------------------------------------------------------------ native events
   window.PAPER = {
     onNative(type, data) {
       const v = J(data, data);
       switch (type) {
-        case 'back': if (liftOpen) closeLift(); else if (railPinned) closeRail(); else if (sheetOpen) closeSheet(); else if (folderOpen >= 0) closeFolder(); else if (over) setOver(''); else goPage(0); break;
-        case 'home': closeRail(); if (hxTarget === 0 && !over && !sheetOpen && folderOpen < 0) staggerHome(); goHome(); break;
+        case 'back': if (toyOpen) closeToy(); else if (liftOpen) closeLift(); else if (railPinned) closeRail(); else if (sheetOpen) closeSheet(); else if (folderOpen >= 0) closeFolder(); else if (over) setOver(''); else goPage(0); break;
+        case 'home': closeToy(true); closeRail(); if (hxTarget === 0 && !over && !sheetOpen && folderOpen < 0) staggerHome(); goHome(); break;
         case 'apps': loadApps(); renderHome(); if (folderOpen < 0) renderFolders(); break;
-        case 'resume': renderClock(); loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
+        case 'resume': sunTick(); renderClock(); loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
         case 'perms': loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
         case 'notifs': case 'media': if (over === 'now' && !replyOpen) renderNow(); break;
         case 'update': onUpdate(v); break;
       }
     },
-    bars() { return ['rgb(236,233,226)', 'rgb(236,233,226)']; },
+    bars() { return themeBars; },
     // For the automated checks (src/check.js).
-    state() { return { hx, hxTarget, tS, tN, over, sheet: sheetOpen, lift: liftOpen, folder: folderOpen, rail: railPop.classList.contains('on'), springs: running.size }; }
+    state() { return { hx, hxTarget, tS, tN, over, sheet: sheetOpen, lift: liftOpen, folder: folderOpen, rail: railPop.classList.contains('on'), springs: running.size, toy: toyOpen, kind: sheetKind, theme: Object.assign({}, S.theme) }; },
+    themes() { return TH.map((c) => { const d = derive(c); return { id: c.id, n: c.n, g: c.g, ink: +d.inkMin.toFixed(2), ink2: +d.ink2Min.toFixed(2) }; }); },
+    patterns() { return PATS.map((x) => x[0]); },
+    toys() { return TOYS.map((t) => t[0]); },
+    setTheme, openToy, closeToy, sunPhase, sunTimes
   };
 
   // ------------------------------------------------------------------ start
@@ -987,11 +1011,13 @@
   else { document.documentElement.style.setProperty('--top', '0px'); document.documentElement.style.setProperty('--bot', '0px'); }
   // Nothing may scroll the frame itself (focus or scroll-into-view would shift every page under the finger).
   ['#app', '#stage', '#pHome', '#pFold'].forEach((sel) => { const el = $(sel); el.addEventListener('scroll', () => { if (el.scrollLeft || el.scrollTop) { el.scrollLeft = 0; el.scrollTop = 0; } }); });
+  applyTheme(false);
   loadApps(); loadEvents();
   renderHome(); renderCal(); renderFolders(); renderNow();
   paint();
   requestAnimationFrame(() => staggerHome());
   setInterval(renderClock, 10000);
+  setInterval(sunTick, 60000);
   window.addEventListener('resize', paint);
   call('ready');
 })();

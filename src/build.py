@@ -21,7 +21,7 @@ html = f"""<!doctype html>
 {r("body.html")}<script>
 {r("mock.js").replace("__ARITY__", arity)}</script>
 <script>
-{r("paper.js")}</script>
+{r("paper.js").replace("/*__THEMES__*/", r("themes.js")).replace("/*__FUN__*/", r("fun.js"))}</script>
 </body>
 </html>
 """

@@ -25,6 +25,18 @@
 
 Back always returns home. Unfolded, Calendar, Home and Folders show side by side.
 
+## The two hidden folders
+
+Neither is on any page. Swipe down and type the name.
+
+- **`fun`** opens **Fun stuff**: 35 small toys in five groups (Decide, Fidget, Watch, Play, Odd). Coin, dice, oracle, bubble wrap, fidget spinner, doodle, lava lamp, Snake, 2048, Simon, a pet rock, and so on. Tap one to open it full screen; × or Back returns to the folder, Home leaves. Scores are kept. Typing a toy's name (`snake`) opens it directly.
+- **`themes`** opens **Themes**. A theme is a color plus an optional pattern:
+  - **Follow the sun** switches between Dawn, Day, Dusk and Night skies using sunrise and sunset for Reston.
+  - **Sets** are ready-made pairs (Tablet, Blueprint, Arcade, Terrazzo, Night sky, Desert, Memphis, Graph paper, Picnic).
+  - **Palettes**, **One color, all the way through** (light and dark of nine hues), **Loud**, and **Gradients**.
+  - **Patterns** go over any color, Soft or Bold: Tablet, Dots, Graph, Blueprint, Hatch, Ripples, Dunes, Stars, Terrazzo, Maze, Crosses, Confetti, Memphis, Stripes, Gingham.
+  - **Surprise me** picks at random; **Back to Paper** undoes everything. Typing a color's name (`lapis`) applies it directly.
+
 ## Changing things
 
 - **Home apps**: Settings → Edit home apps, or hold an app on Home. An app shown crossed out wasn't found on the phone: hold it and tap *Choose the app*.
