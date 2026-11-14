@@ -88,6 +88,21 @@ const path = require('path');
   await swipe(180, 700, 180, 400, 200); expect((await st()).over === 'now', 'swipe up → now'); await shot('09-now');
   const dock = await p.$$eval('#dock .dl', (els) => els.map((e) => e.textContent));
   expect(dock.join(',') === 'Camera,Gallery,Clock,Settings,Contacts', 'dock (got ' + dock + ')');
+  // the player
+  expect(!!(await p.$('#nowlist .mcard .mart img')) && !!(await p.$('#nowlist .mcard .mbg')), 'player shows the artwork');
+  expect(/Playing · YT Music/.test(await p.$eval('#nowlist .mcard .mono', (e) => e.textContent)), 'player says where it plays from');
+  const tr = await (await p.$('#nowlist .strack')).boundingBox();
+  await touch('touchStart', tr.x + tr.width * 0.5, tr.y + 2); await wait(60);
+  for (let i = 1; i <= 6; i++) { await touch('touchMove', tr.x + tr.width * (0.5 - i * 0.04), tr.y + 2 + i * 3); await wait(30); }
+  await shot('09b-now-seeking'); await touch('touchEnd'); await wait(300);
+  const mpos = await p.evaluate(() => JSON.parse(PaperNative.media()).position);
+  expect(Math.abs(mpos - 240000 * 0.26) < 4000 && (await st()).over === 'now', 'drag the bar seeks to ~1:02 and Now stays open (' + mpos + ')');
+  await tapEl('#nowlist [data-media="toggle"]'); await wait(80);
+  expect((await p.$eval('#nowlist [data-media="toggle"]', (e) => e.getAttribute('aria-label'))) === 'Play', 'pause flips at once');
+  await wait(700); expect(/Paused/.test(await p.$eval('#nowlist .mcard .mono', (e) => e.textContent)), 'and the card says Paused');
+  await tapEl('#nowlist [data-media="next"]'); await wait(700);
+  expect((await p.$eval('#nowlist .mcard .ti', (e) => e.textContent)) === 'Night drive, side A', 'next track');
+  await tapEl('#nowlist [data-media="toggle"]'); await wait(800); await shot('09c-now-player');
   await swipe(180, 200, 180, 600, 200); expect((await st()).over === '', 'swipe down closes now');
   // rail
   const rail = await (await p.$('#rail')).boundingBox();
@@ -164,7 +179,8 @@ const path = require('path');
   await swipe(330, 450, 60, 450); await shot('19-tablet-folders'); await tapEl('[data-tile="1"]'); await settle(); await shot('20-tablet-folder-open');
   await p.evaluate(() => PAPER.onNative('back', null)); await settle();
   await swipe(60, 450, 330, 450); await swipe(60, 450, 330, 450); await shot('21-tablet-calendar'); await swipe(330, 450, 60, 450);
-  await swipe(180, 700, 180, 400, 200); await shot('22-tablet-now'); await swipe(180, 200, 180, 600, 200);
+  await swipe(180, 700, 180, 400, 200); await shot('22-tablet-now');
+  await p.evaluate(() => PAPER.setTheme({ color: 'g-ember', pat: 'none' })); await wait(800); await shot('22b-ember-now'); await p.evaluate(() => PAPER.setTheme({ color: 'lapis', pat: 'wedges' })); await wait(300); await swipe(180, 200, 180, 600, 200);
   await swipe(180, 300, 180, 520, 160, 8); await shot('23-tablet-search'); await swipe(180, 640, 180, 380, 140, 8);
   // every color and every pattern applies cleanly; a sample gets photographed
   const pats = await p.evaluate(() => PAPER.patterns());

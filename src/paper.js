@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.5.1';
+  const PAGE_VERSION = '0.6.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -213,6 +213,7 @@
   function gStart(x, y, target) {
     if (toyOpen) { G = null; return; }
     if (target.closest('#rail')) { railStart(y, x); G = { rail: true }; return; }
+    if (target.closest('.seek')) { G = { seek: true }; seeking = true; target.closest('.mcard').classList.add('seeking'); seekAt(x); haptic('tick'); return; }
     if (target.closest('#dots')) { G = { dots: true, x, y, moved: false, pts: [[performance.now(), x]] }; stopSpring('hx'); dotsAt(x); return; }
     if (liftOpen) { if (!target.closest('#liftMenu')) { closeLift(); G = { eat: true }; } return; }
     if (sheetOpen) {
@@ -242,6 +243,7 @@
   function gMove(x, y) {
     if (!G) return false;
     if (G.rail) { railMove(y, x); return true; }
+    if (G.seek) { seekAt(x); return true; }
     if (G.eat) return true;
     if (G.dots) { G.moved = G.moved || Math.abs(x - G.x) > 6; G.pts.push([performance.now(), x]); dotsAt(x); return true; }
     if (G.sheetMaybe) {
@@ -305,6 +307,7 @@
     const s = G; G = null;
     if (!s) return;
     if (s.sheetMaybe) return;
+    if (s.seek) { seekAt(x, true); seeking = null; const c = document.querySelector('#nowlist .mcard'); if (c) c.classList.remove('seeking'); haptic('tick'); suppress(); return; }
     if (s.rail) { railEnd(x, y); suppress(); return; }
     if (s.eat) { suppress(); return; }
     if (s.dots) {
@@ -699,6 +702,48 @@
     MEDIA = J(call('media'), null);
     NOTIFS = J(call('notifs'), []);
   }
+  // ---- the player: artwork, what's playing and from where, a bar you can drag to seek, big controls.
+  const fmtT = (ms) => { ms = Math.max(0, ms || 0); const t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s2 = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s2).padStart(2, '0'); };
+  const mediaPos = () => !MEDIA ? 0 : Math.min(MEDIA.duration || Infinity, Math.max(0, (MEDIA.position || 0) + (MEDIA.playing && MEDIA.positionAt ? (Date.now() - MEDIA.positionAt) * (MEDIA.speed || 1) : 0)));
+  const mediaApp = () => MEDIA && APPS.find((a) => a.pkg === MEDIA.pkg);
+  const MICON = {
+    prev: '<svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6.2v11.6a.8.8 0 0 1-1.25.66L9.6 12.66a.8.8 0 0 1 0-1.32l8.15-5.8A.8.8 0 0 1 19 6.2z" fill="currentColor"/></svg>',
+    next: '<svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5.5v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 6.2v11.6a.8.8 0 0 0 1.25.66l8.15-5.8a.8.8 0 0 0 0-1.32L6.25 5.54A.8.8 0 0 0 5 6.2z" fill="currentColor"/></svg>',
+    play: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6z" style="fill:var(--bg)"/></svg>',
+    pause: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.3" style="fill:var(--bg)"/><rect x="13.5" y="5" width="4" height="14" rx="1.3" style="fill:var(--bg)"/></svg>',
+    note: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>'
+  };
+  function mediaCard() {
+    const M = MEDIA, app = mediaApp(), pos = mediaPos(), dur = M.duration > 0 ? M.duration : 0, pct = dur ? (100 * pos / dur) : 0;
+    const sub = [M.artist, M.album && M.album !== M.title ? M.album : ''].filter(Boolean).join(' · ');
+    return '<section class="glass card mcard' + (M.art ? ' hasart' : '') + '">' + (M.art ? '<div class="mbg" style="background-image:url(\'' + esc(M.art) + '\')"></div>' : '') +
+      '<div class="mtop"><button class="mart" data-mopen="1" aria-label="Open ' + esc(app ? app.label : 'the player') + '">' + (M.art ? '<img src="' + esc(M.art) + '" alt="">' : app && app.icon ? appIcon(app) : MICON.note) + '</button>' +
+      '<span class="col"><span class="mono">' + (M.playing ? '<i class="eq"><b></b><b></b><b></b></i>' : '') + (M.playing ? 'Playing' : 'Paused') + (app ? ' · ' + esc(shortName(app.label)) : '') + '</span>' +
+      '<span class="ti">' + esc(M.title) + '</span>' + (sub ? '<span class="tx one">' + esc(sub) + '</span>' : '') + '</span></div>' +
+      (dur ? '<div class="seek" data-seek="1"><div class="strack"><i class="sfill" style="width:' + pct.toFixed(2) + '%"></i><b class="sknob" style="left:' + pct.toFixed(2) + '%"></b></div>' +
+        '<div class="stimes mono"><span class="st0">' + fmtT(pos) + '</span><span class="st1">−' + fmtT(dur - pos) + '</span></div></div>' : '') +
+      '<div class="mctl"><button class="mb" data-media="prev" aria-label="Previous">' + MICON.prev + '</button>' +
+      '<button class="mb play" data-media="toggle" aria-label="' + (M.playing ? 'Pause' : 'Play') + '">' + (M.playing ? MICON.pause : MICON.play) + '</button>' +
+      '<button class="mb" data-media="next" aria-label="Next">' + MICON.next + '</button></div></section>';
+  }
+  // Keep the bar and the times moving while Now is open.
+  let seeking = null;
+  function tickMedia() {
+    if (over !== 'now' || !MEDIA || !MEDIA.duration || seeking) return;
+    const card = document.querySelector('#nowlist .mcard'); if (!card) return;
+    const pos = mediaPos(), pct = 100 * pos / MEDIA.duration;
+    const f = card.querySelector('.sfill'), k = card.querySelector('.sknob');
+    if (f) { f.style.width = pct.toFixed(2) + '%'; k.style.left = pct.toFixed(2) + '%'; card.querySelector('.st0').textContent = fmtT(pos); card.querySelector('.st1').textContent = '−' + fmtT(MEDIA.duration - pos); }
+  }
+  setInterval(tickMedia, 500);
+  function seekAt(x, done) {
+    const card = document.querySelector('#nowlist .mcard'), tr = card && card.querySelector('.strack'); if (!tr || !MEDIA) return;
+    const r = tr.getBoundingClientRect(), f = Math.max(0, Math.min(1, (x - r.left) / r.width)), pos = f * MEDIA.duration;
+    card.querySelector('.sfill').style.width = (f * 100) + '%'; card.querySelector('.sknob').style.left = (f * 100) + '%';
+    card.querySelector('.st0').textContent = fmtT(pos); card.querySelector('.st1').textContent = '−' + fmtT(MEDIA.duration - pos);
+    if (done) { call('mediaCmd', 'seek:' + Math.round(pos)); MEDIA.position = pos; MEDIA.positionAt = Date.now(); }
+    return pos;
+  }
   function renderNow() {
     loadNow();
     const parts = [];
@@ -713,15 +758,7 @@
     } else if (!calAllowed) {
       parts.push('<section class="glass card hrow"><span class="tx">Allow calendar to see what’s next.</span><button class="btn sm" data-perm="calendar">Allow</button></section>');
     }
-    if (MEDIA && MEDIA.title) {
-      const pct = MEDIA.duration > 0 && MEDIA.position >= 0 ? Math.min(100, Math.round(100 * (MEDIA.position + (MEDIA.playing && MEDIA.positionAt ? Date.now() - MEDIA.positionAt : 0) * (MEDIA.speed || 1)) / MEDIA.duration)) : 0;
-      parts.push('<section class="glass card"><div class="hrow"><span class="col"><span class="mono">' + (MEDIA.playing ? 'Playing' : 'Paused') + '</span><span class="ti">' + esc(MEDIA.title) + '</span>' +
-        (MEDIA.artist ? '<span class="tx one">' + esc(MEDIA.artist) + '</span>' : '') + '</span><span class="ctl">' +
-        '<button class="ib" data-media="prev" aria-label="Previous">' + ICON.prev + '</button>' +
-        '<button class="ib solid" data-media="toggle" aria-label="' + (MEDIA.playing ? 'Pause' : 'Play') + '">' + (MEDIA.playing ? ICON.pause : ICON.play) + '</button>' +
-        '<button class="ib" data-media="next" aria-label="Next">' + ICON.next + '</button></span></div>' +
-        (pct ? '<div class="bar"><i style="width:' + pct + '%"></i></div>' : '') + '</section>');
-    }
+    if (MEDIA && MEDIA.title) parts.push(mediaCard());
     const p = J(call('perms'), {});
     if (!p.notif) {
       parts.push('<section class="glass card hrow"><span class="tx">Turn on notification access to see messages and music here.</span><button class="btn sm" data-perm="notif">Turn on</button></section>');
@@ -937,7 +974,12 @@
     if (d.ev) { call('openEvent', d.ev); return; }
     if (d.res !== undefined) { runResult(+d.res); return; }
     if (d.route) { call('maps', d.route); return; }
-    if (d.media) { call('mediaCmd', d.media); setTimeout(renderNow, 350); return; }
+    if (d.media) {
+      call('mediaCmd', d.media); haptic('tap');
+      if (d.media === 'toggle' && MEDIA) { MEDIA.position = mediaPos(); MEDIA.positionAt = Date.now(); MEDIA.playing = !MEDIA.playing; const b = t; b.innerHTML = MEDIA.playing ? MICON.pause : MICON.play; b.setAttribute('aria-label', MEDIA.playing ? 'Pause' : 'Play'); }
+      setTimeout(renderNow, d.media === 'toggle' ? 600 : 450); return;
+    }
+    if (d.mopen) { const a = mediaApp(); if (a) open(a.key, a.label); return; }
     if (d.perm) { call('askPerm', d.perm); return; }
     if (d.notif) { call('notifOpen', d.notif); return; }
     if (d.reply) { replyOpen = d.reply; renderNow(); return; }

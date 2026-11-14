@@ -177,6 +177,36 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .di{display:flex;color:var(--ink)}
 .dl{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink2)}
 
+/* the player */
+.mcard{position:relative;overflow:hidden;padding:16px 16px 10px;gap:12px}
+.mbg{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(36px) saturate(1.5);opacity:.32;pointer-events:none}
+.mcard>*:not(.mbg){position:relative}
+.mtop{display:flex;align-items:center;gap:14px;min-width:0}
+.mart{width:72px;height:72px;border-radius:14px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--ink2);
+  box-shadow:0 8px 22px rgba(0,0,0,.22),0 0 0 .5px rgba(var(--inkRGB),.12);transition:transform .25s var(--ease)}
+.mart:active{transform:scale(.94)}
+.mart img{width:100%;height:100%;object-fit:cover}
+.mart .fic{width:100%;height:100%;border-radius:0;box-shadow:none}
+.mcard .ti{font-size:19px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}
+.mcard .mono{display:flex;align-items:center;gap:6px}
+.eq{display:inline-flex;align-items:flex-end;gap:2px;height:10px}
+.eq b{width:2px;background:var(--acc);border-radius:1px;animation:eq 1s ease-in-out infinite}
+.eq b:nth-child(2){animation-delay:-.35s}.eq b:nth-child(3){animation-delay:-.7s}
+@keyframes eq{0%,100%{height:3px}50%{height:10px}}
+.seek{padding:8px 0 0;touch-action:none;cursor:pointer}
+.strack{position:relative;height:5px;border-radius:3px;background:rgba(var(--inkRGB),.14);transition:height .2s var(--ease)}
+.sfill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink)}
+.sknob{position:absolute;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.25);transform:scale(.0);transition:transform .2s var(--pop)}
+.mcard.seeking .strack{height:9px}
+.mcard.seeking .sknob,.seek:hover .sknob{transform:scale(1)}
+.mcard.seeking .sknob{transform:scale(1.5)}
+.stimes{display:flex;justify-content:space-between;margin-top:7px;font-size:10.5px;font-variant-numeric:tabular-nums}
+.mctl{display:flex;align-items:center;justify-content:center;gap:30px;padding:2px 0 4px}
+.mb{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink);transition:transform .2s var(--pop),background-color .2s}
+.mb:active{transform:scale(.86);background:var(--soft)}
+.mb.play{width:66px;height:66px;background:var(--ink);box-shadow:0 8px 22px rgba(0,0,0,.2)}
+.mb.play:active{transform:scale(.9);background:var(--ink)}
+
 /* hold: lift + menu */
 #lift{position:absolute;inset:0;z-index:8;display:none}
 #lift.on{display:block}
@@ -400,7 +430,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
     { id: 'n2', pkg: 'app.whatsapp', kind: 'msg', title: 'Leo', text: 'pizza after? you owe me 20', person: 'Leo', convo: 'Leo', group: false, time: now - 31 * MIN, live: true, canReply: true, actions: [] },
     { id: 'n3', pkg: 'app.gmail', kind: 'email', title: 'Permit office', text: 'Your review comments are ready', person: '', convo: '', group: false, time: now - 52 * MIN, live: true, canReply: false, actions: ['Archive'] }
   ];
-  var media = { pkg: 'app.youtubemusic', title: 'Slow piano, side B', artist: 'Example Artist', duration: 240000, position: 80000, positionAt: now, speed: 1, playing: true };
+  var media = { pkg: 'app.youtubemusic', title: 'Slow piano, side B', artist: 'Example Artist', album: 'Quiet Rooms', duration: 240000, position: 80000, positionAt: now, speed: 1, playing: true,
+    art: 'data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><defs><linearGradient id='a' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#F2B544'/><stop offset='.55' stop-color='#C4551F'/><stop offset='1' stop-color='#3A1458'/></linearGradient></defs><rect width='200' height='200' fill='url(#a)'/><circle cx='138' cy='70' r='34' fill='#FBE7C6' opacity='.85'/><path d='M0 150 Q60 112 110 140 T200 128 V200 H0Z' fill='#1E1A3E' opacity='.8'/></svg>") };
   var perms = { notif: true, calendar: true, contacts: true, dnd: true, phone: true, alarms: true, usage: false, isHome: false };
   function at(addDays, h, m) { var d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, m, 0, 0); return d.getTime(); }
   function emit(type, data) { setTimeout(function () { window.PAPER && PAPER.onNative(type, data === undefined ? null : data); }, 60); }
@@ -418,7 +449,13 @@ if (!window.PaperNative) window.PaperNative = (function () {
     dismissAll: function () { notifs = []; emit('notifs'); },
     notifReply: function (id) { notifs = notifs.filter(function (n) { return n.id !== id; }); emit('notifs'); return true; },
     media: function () { return JSON.stringify(media); },
-    mediaCmd: function (c) { media.playing = c === 'toggle' ? !media.playing : c !== 'pause'; media.positionAt = Date.now(); emit('media', JSON.stringify(media)); },
+    mediaCmd: function (c) {
+      var at = Date.now(); media.position = Math.min(media.duration, media.position + (media.playing ? at - media.positionAt : 0)); media.positionAt = at;
+      if (/^seek:/.test(c)) media.position = +c.slice(5);
+      else if (c === 'next' || c === 'prev') { media.position = 0; media.title = c === 'next' ? 'Night drive, side A' : 'Slow piano, side B'; }
+      else media.playing = c === 'toggle' ? !media.playing : c !== 'pause';
+      emit('media', JSON.stringify(media));
+    },
     events: function () { return JSON.stringify(ev); },
     openEvent: function () {}, newEvent: function () { return true; },
     contacts: function () { return '[]'; }, call: function () {}, sms: function () {}, openContact: function () {},
@@ -458,7 +495,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.5.1';
+  const PAGE_VERSION = '0.6.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -663,6 +700,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   function gStart(x, y, target) {
     if (toyOpen) { G = null; return; }
     if (target.closest('#rail')) { railStart(y, x); G = { rail: true }; return; }
+    if (target.closest('.seek')) { G = { seek: true }; seeking = true; target.closest('.mcard').classList.add('seeking'); seekAt(x); haptic('tick'); return; }
     if (target.closest('#dots')) { G = { dots: true, x, y, moved: false, pts: [[performance.now(), x]] }; stopSpring('hx'); dotsAt(x); return; }
     if (liftOpen) { if (!target.closest('#liftMenu')) { closeLift(); G = { eat: true }; } return; }
     if (sheetOpen) {
@@ -692,6 +730,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   function gMove(x, y) {
     if (!G) return false;
     if (G.rail) { railMove(y, x); return true; }
+    if (G.seek) { seekAt(x); return true; }
     if (G.eat) return true;
     if (G.dots) { G.moved = G.moved || Math.abs(x - G.x) > 6; G.pts.push([performance.now(), x]); dotsAt(x); return true; }
     if (G.sheetMaybe) {
@@ -755,6 +794,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     const s = G; G = null;
     if (!s) return;
     if (s.sheetMaybe) return;
+    if (s.seek) { seekAt(x, true); seeking = null; const c = document.querySelector('#nowlist .mcard'); if (c) c.classList.remove('seeking'); haptic('tick'); suppress(); return; }
     if (s.rail) { railEnd(x, y); suppress(); return; }
     if (s.eat) { suppress(); return; }
     if (s.dots) {
@@ -1149,6 +1189,48 @@ if (!window.PaperNative) window.PaperNative = (function () {
     MEDIA = J(call('media'), null);
     NOTIFS = J(call('notifs'), []);
   }
+  // ---- the player: artwork, what's playing and from where, a bar you can drag to seek, big controls.
+  const fmtT = (ms) => { ms = Math.max(0, ms || 0); const t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s2 = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s2).padStart(2, '0'); };
+  const mediaPos = () => !MEDIA ? 0 : Math.min(MEDIA.duration || Infinity, Math.max(0, (MEDIA.position || 0) + (MEDIA.playing && MEDIA.positionAt ? (Date.now() - MEDIA.positionAt) * (MEDIA.speed || 1) : 0)));
+  const mediaApp = () => MEDIA && APPS.find((a) => a.pkg === MEDIA.pkg);
+  const MICON = {
+    prev: '<svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6.2v11.6a.8.8 0 0 1-1.25.66L9.6 12.66a.8.8 0 0 1 0-1.32l8.15-5.8A.8.8 0 0 1 19 6.2z" fill="currentColor"/></svg>',
+    next: '<svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5.5v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 6.2v11.6a.8.8 0 0 0 1.25.66l8.15-5.8a.8.8 0 0 0 0-1.32L6.25 5.54A.8.8 0 0 0 5 6.2z" fill="currentColor"/></svg>',
+    play: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.52.85l10.2-6.4a1 1 0 0 0 0-1.7L9.52 4.75A1 1 0 0 0 8 5.6z" style="fill:var(--bg)"/></svg>',
+    pause: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.3" style="fill:var(--bg)"/><rect x="13.5" y="5" width="4" height="14" rx="1.3" style="fill:var(--bg)"/></svg>',
+    note: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>'
+  };
+  function mediaCard() {
+    const M = MEDIA, app = mediaApp(), pos = mediaPos(), dur = M.duration > 0 ? M.duration : 0, pct = dur ? (100 * pos / dur) : 0;
+    const sub = [M.artist, M.album && M.album !== M.title ? M.album : ''].filter(Boolean).join(' · ');
+    return '<section class="glass card mcard' + (M.art ? ' hasart' : '') + '">' + (M.art ? '<div class="mbg" style="background-image:url(\'' + esc(M.art) + '\')"></div>' : '') +
+      '<div class="mtop"><button class="mart" data-mopen="1" aria-label="Open ' + esc(app ? app.label : 'the player') + '">' + (M.art ? '<img src="' + esc(M.art) + '" alt="">' : app && app.icon ? appIcon(app) : MICON.note) + '</button>' +
+      '<span class="col"><span class="mono">' + (M.playing ? '<i class="eq"><b></b><b></b><b></b></i>' : '') + (M.playing ? 'Playing' : 'Paused') + (app ? ' · ' + esc(shortName(app.label)) : '') + '</span>' +
+      '<span class="ti">' + esc(M.title) + '</span>' + (sub ? '<span class="tx one">' + esc(sub) + '</span>' : '') + '</span></div>' +
+      (dur ? '<div class="seek" data-seek="1"><div class="strack"><i class="sfill" style="width:' + pct.toFixed(2) + '%"></i><b class="sknob" style="left:' + pct.toFixed(2) + '%"></b></div>' +
+        '<div class="stimes mono"><span class="st0">' + fmtT(pos) + '</span><span class="st1">−' + fmtT(dur - pos) + '</span></div></div>' : '') +
+      '<div class="mctl"><button class="mb" data-media="prev" aria-label="Previous">' + MICON.prev + '</button>' +
+      '<button class="mb play" data-media="toggle" aria-label="' + (M.playing ? 'Pause' : 'Play') + '">' + (M.playing ? MICON.pause : MICON.play) + '</button>' +
+      '<button class="mb" data-media="next" aria-label="Next">' + MICON.next + '</button></div></section>';
+  }
+  // Keep the bar and the times moving while Now is open.
+  let seeking = null;
+  function tickMedia() {
+    if (over !== 'now' || !MEDIA || !MEDIA.duration || seeking) return;
+    const card = document.querySelector('#nowlist .mcard'); if (!card) return;
+    const pos = mediaPos(), pct = 100 * pos / MEDIA.duration;
+    const f = card.querySelector('.sfill'), k = card.querySelector('.sknob');
+    if (f) { f.style.width = pct.toFixed(2) + '%'; k.style.left = pct.toFixed(2) + '%'; card.querySelector('.st0').textContent = fmtT(pos); card.querySelector('.st1').textContent = '−' + fmtT(MEDIA.duration - pos); }
+  }
+  setInterval(tickMedia, 500);
+  function seekAt(x, done) {
+    const card = document.querySelector('#nowlist .mcard'), tr = card && card.querySelector('.strack'); if (!tr || !MEDIA) return;
+    const r = tr.getBoundingClientRect(), f = Math.max(0, Math.min(1, (x - r.left) / r.width)), pos = f * MEDIA.duration;
+    card.querySelector('.sfill').style.width = (f * 100) + '%'; card.querySelector('.sknob').style.left = (f * 100) + '%';
+    card.querySelector('.st0').textContent = fmtT(pos); card.querySelector('.st1').textContent = '−' + fmtT(MEDIA.duration - pos);
+    if (done) { call('mediaCmd', 'seek:' + Math.round(pos)); MEDIA.position = pos; MEDIA.positionAt = Date.now(); }
+    return pos;
+  }
   function renderNow() {
     loadNow();
     const parts = [];
@@ -1163,15 +1245,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     } else if (!calAllowed) {
       parts.push('<section class="glass card hrow"><span class="tx">Allow calendar to see what’s next.</span><button class="btn sm" data-perm="calendar">Allow</button></section>');
     }
-    if (MEDIA && MEDIA.title) {
-      const pct = MEDIA.duration > 0 && MEDIA.position >= 0 ? Math.min(100, Math.round(100 * (MEDIA.position + (MEDIA.playing && MEDIA.positionAt ? Date.now() - MEDIA.positionAt : 0) * (MEDIA.speed || 1)) / MEDIA.duration)) : 0;
-      parts.push('<section class="glass card"><div class="hrow"><span class="col"><span class="mono">' + (MEDIA.playing ? 'Playing' : 'Paused') + '</span><span class="ti">' + esc(MEDIA.title) + '</span>' +
-        (MEDIA.artist ? '<span class="tx one">' + esc(MEDIA.artist) + '</span>' : '') + '</span><span class="ctl">' +
-        '<button class="ib" data-media="prev" aria-label="Previous">' + ICON.prev + '</button>' +
-        '<button class="ib solid" data-media="toggle" aria-label="' + (MEDIA.playing ? 'Pause' : 'Play') + '">' + (MEDIA.playing ? ICON.pause : ICON.play) + '</button>' +
-        '<button class="ib" data-media="next" aria-label="Next">' + ICON.next + '</button></span></div>' +
-        (pct ? '<div class="bar"><i style="width:' + pct + '%"></i></div>' : '') + '</section>');
-    }
+    if (MEDIA && MEDIA.title) parts.push(mediaCard());
     const p = J(call('perms'), {});
     if (!p.notif) {
       parts.push('<section class="glass card hrow"><span class="tx">Turn on notification access to see messages and music here.</span><button class="btn sm" data-perm="notif">Turn on</button></section>');
@@ -1387,7 +1461,12 @@ if (!window.PaperNative) window.PaperNative = (function () {
     if (d.ev) { call('openEvent', d.ev); return; }
     if (d.res !== undefined) { runResult(+d.res); return; }
     if (d.route) { call('maps', d.route); return; }
-    if (d.media) { call('mediaCmd', d.media); setTimeout(renderNow, 350); return; }
+    if (d.media) {
+      call('mediaCmd', d.media); haptic('tap');
+      if (d.media === 'toggle' && MEDIA) { MEDIA.position = mediaPos(); MEDIA.positionAt = Date.now(); MEDIA.playing = !MEDIA.playing; const b = t; b.innerHTML = MEDIA.playing ? MICON.pause : MICON.play; b.setAttribute('aria-label', MEDIA.playing ? 'Pause' : 'Play'); }
+      setTimeout(renderNow, d.media === 'toggle' ? 600 : 450); return;
+    }
+    if (d.mopen) { const a = mediaApp(); if (a) open(a.key, a.label); return; }
     if (d.perm) { call('askPerm', d.perm); return; }
     if (d.notif) { call('notifOpen', d.notif); return; }
     if (d.reply) { replyOpen = d.reply; renderNow(); return; }

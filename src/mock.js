@@ -23,7 +23,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
     { id: 'n2', pkg: 'app.whatsapp', kind: 'msg', title: 'Leo', text: 'pizza after? you owe me 20', person: 'Leo', convo: 'Leo', group: false, time: now - 31 * MIN, live: true, canReply: true, actions: [] },
     { id: 'n3', pkg: 'app.gmail', kind: 'email', title: 'Permit office', text: 'Your review comments are ready', person: '', convo: '', group: false, time: now - 52 * MIN, live: true, canReply: false, actions: ['Archive'] }
   ];
-  var media = { pkg: 'app.youtubemusic', title: 'Slow piano, side B', artist: 'Example Artist', duration: 240000, position: 80000, positionAt: now, speed: 1, playing: true };
+  var media = { pkg: 'app.youtubemusic', title: 'Slow piano, side B', artist: 'Example Artist', album: 'Quiet Rooms', duration: 240000, position: 80000, positionAt: now, speed: 1, playing: true,
+    art: 'data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><defs><linearGradient id='a' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#F2B544'/><stop offset='.55' stop-color='#C4551F'/><stop offset='1' stop-color='#3A1458'/></linearGradient></defs><rect width='200' height='200' fill='url(#a)'/><circle cx='138' cy='70' r='34' fill='#FBE7C6' opacity='.85'/><path d='M0 150 Q60 112 110 140 T200 128 V200 H0Z' fill='#1E1A3E' opacity='.8'/></svg>") };
   var perms = { notif: true, calendar: true, contacts: true, dnd: true, phone: true, alarms: true, usage: false, isHome: false };
   function at(addDays, h, m) { var d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, m, 0, 0); return d.getTime(); }
   function emit(type, data) { setTimeout(function () { window.PAPER && PAPER.onNative(type, data === undefined ? null : data); }, 60); }
@@ -41,7 +42,13 @@ if (!window.PaperNative) window.PaperNative = (function () {
     dismissAll: function () { notifs = []; emit('notifs'); },
     notifReply: function (id) { notifs = notifs.filter(function (n) { return n.id !== id; }); emit('notifs'); return true; },
     media: function () { return JSON.stringify(media); },
-    mediaCmd: function (c) { media.playing = c === 'toggle' ? !media.playing : c !== 'pause'; media.positionAt = Date.now(); emit('media', JSON.stringify(media)); },
+    mediaCmd: function (c) {
+      var at = Date.now(); media.position = Math.min(media.duration, media.position + (media.playing ? at - media.positionAt : 0)); media.positionAt = at;
+      if (/^seek:/.test(c)) media.position = +c.slice(5);
+      else if (c === 'next' || c === 'prev') { media.position = 0; media.title = c === 'next' ? 'Night drive, side A' : 'Slow piano, side B'; }
+      else media.playing = c === 'toggle' ? !media.playing : c !== 'pause';
+      emit('media', JSON.stringify(media));
+    },
     events: function () { return JSON.stringify(ev); },
     openEvent: function () {}, newEvent: function () { return true; },
     contacts: function () { return '[]'; }, call: function () {}, sms: function () {}, openContact: function () {},
