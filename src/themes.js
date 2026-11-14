@@ -214,9 +214,74 @@
     const rgb = (h) => 'rgb(' + rgbOf(h).join(',') + ')';
     themeBars = c.grad ? [rgb(c.grad[0]), rgb(c.grad[c.grad.length - 1])] : [rgb(c.bg), rgb(c.bg)];
     lastPhase = S.theme.auto ? sunPhase(Date.now()) : '';
+    wxColor = null;
   }
-  function setTheme(patch) { Object.assign(S.theme, patch); save(); applyTheme(true); markThemes(); haptic('tick'); }
-  function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } }
+
+  // ---- weather, as on jere.ing: Clear, Rain or Storm, drawn behind everything. "Real" follows Reston's actual weather.
+  // The rain only animates while Paper is on screen and nothing full-screen covers it.
+  const WX = [['clear', 'Clear'], ['rain', 'Rain'], ['storm', 'Storm'], ['real', 'Real']];
+  let wxDrops = [], wxRaf = 0, wxLast = 0, wxBoltAt = 0, wxColor = null, wxKind = '', wxFetching = false;
+  const WX_TEXT = { 0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Fog', 51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle', 56: 'Freezing drizzle', 57: 'Freezing drizzle', 61: 'Rain', 63: 'Rain', 65: 'Heavy rain',
+    66: 'Freezing rain', 67: 'Freezing rain', 71: 'Snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow', 80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm' };
+  const codeKind = (c) => (c >= 95 ? 'storm' : (c >= 51 && c <= 67) || (c >= 80 && c <= 82) ? 'rain' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snow' : 'clear');
+  function liveWeather() {
+    const L = S.theme.live;
+    if (L && Date.now() - L.at < 30 * 6e4) return L;
+    if (!wxFetching) {
+      wxFetching = true;
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=38.9586&longitude=-77.357&current=weather_code,temperature_2m&temperature_unit=fahrenheit')
+        .then((r) => r.json()).then((j) => { const c = j.current; S.theme.live = { at: Date.now(), code: c.weather_code, temp: Math.round(c.temperature_2m) }; save(); })
+        .catch(() => { S.theme.live = { at: Date.now() - 25 * 6e4, code: -1 }; })
+        .then(() => { wxFetching = false; applyWeather(); markThemes(); });
+    }
+    return L || null;
+  }
+  function weatherKind() {
+    if (S.theme.wx !== 'real') return S.theme.wx || 'clear';
+    const L = liveWeather(); return L && L.code >= 0 ? codeKind(L.code) : 'clear';
+  }
+  function wxSeed() {
+    const cv = $('#wx'), w = innerWidth, h = innerHeight, d = Math.min(2, devicePixelRatio || 1);
+    cv.width = w * d; cv.height = h * d; cv.getContext('2d').setTransform(d, 0, 0, d, 0, 0);
+    const snow = wxKind === 'snow', n = Math.round(w * h / (wxKind === 'storm' ? 5200 : snow ? 7000 : 9500));
+    wxDrops = Array.from({ length: n }, () => ({ x: Math.random() * w * 1.2, y: Math.random() * h, l: 9 + Math.random() * 12, v: snow ? 30 + Math.random() * 50 : 520 + Math.random() * 340, a: 0.35 + Math.random() * 0.65, r: 1 + Math.random() * 2.2, p: Math.random() * 6.28 }));
+  }
+  function wxFrame(t) {
+    wxRaf = 0;
+    if (!wxKind || document.hidden || toyOpen) return;
+    wxRaf = requestAnimationFrame(wxFrame);
+    if (t - wxLast < 30) return;                                 // ~30 fps is plenty for rain and kinder to the battery
+    const dt = Math.min(0.05, (t - wxLast) / 1000); wxLast = t;
+    const cv = $('#wx'), ctx = cv.getContext('2d'), w = innerWidth, h = innerHeight;
+    if (!wxColor) wxColor = cssv('--inkRGB');
+    ctx.clearRect(0, 0, w, h);
+    if (wxKind === 'snow') {
+      ctx.fillStyle = 'rgb(' + wxColor + ')';
+      wxDrops.forEach((d) => { d.y += d.v * dt; d.x += Math.sin(t / 900 + d.p) * 12 * dt; if (d.y > h + 4) { d.y = -4; d.x = Math.random() * w; } ctx.globalAlpha = d.a * 0.5; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 7); ctx.fill(); });
+    } else {
+      const slant = wxKind === 'storm' ? 0.28 : 0.16;
+      ctx.strokeStyle = 'rgb(' + wxColor + ')'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+      wxDrops.forEach((d) => { d.y += d.v * dt; d.x -= d.v * slant * dt; if (d.y > h + 20) { d.y = -20; d.x = Math.random() * w * 1.2; }
+        ctx.globalAlpha = d.a * 0.32; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.l * slant, d.y - d.l); ctx.stroke(); });
+      if (wxKind === 'storm' && t > wxBoltAt) {
+        if (wxBoltAt) { const b = $('#bolt'); b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); }
+        wxBoltAt = t + 6000 + Math.random() * 12000;
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function applyWeather() {
+    const k = weatherKind(), cv = $('#wx');
+    if (k === 'clear') { wxKind = ''; cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); cv.style.display = 'none'; return; }
+    cv.style.display = '';
+    if (k !== wxKind) { wxKind = k; wxSeed(); wxBoltAt = performance.now() + 2500; }
+    if (!wxRaf) { wxLast = performance.now(); wxRaf = requestAnimationFrame(wxFrame); }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) applyWeather(); });
+  window.addEventListener('resize', () => { if (wxKind) wxSeed(); });
+
+  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); markThemes(); haptic('tick'); }
+  function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
   const SETS = [['Tablet', 'lapis', 'wedges', 'bold'], ['Blueprint', 'blueprint', 'blueprint', 'bold'], ['Arcade', 'arcade', 'maze', 'soft'], ['Terrazzo', 'sand', 'terrazzo', 'bold'], ['Night sky', 'sun-night', 'stars', 'bold'],
@@ -226,7 +291,8 @@
   function openThemes() {
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
-      '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div></div>' +
+      '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div>' +
+      '<p class="mono" style="margin:18px 0 8px">Weather</p><div class="wxseg">' + WX.map(([k, n]) => '<button class="btn sm" data-wx="' + k + '">' + n + '</button>').join('') + '</div><p class="hint" id="wxLine" style="margin:8px 0 0"></p></div>' +
       '<div class="grp"><p class="mono">Sets</p><div class="btnrow" style="margin-top:0">' + SETS.map((s, i) => '<button class="btn sm" data-set="' + i + '">' + s[0] + '</button>').join('') + '</div></div>' +
       '<div class="grp"><p class="mono">Palettes</p>' + group('pal') + '</div>' +
       '<div class="grp"><p class="mono">One color, all the way through</p>' + group('mono') + '</div>' +
@@ -243,10 +309,14 @@
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');
     $('#patGrid').querySelectorAll('.swp').forEach((el, i) => { const id = PATS[i][0], t = patCache[id] || (PATS[i][2] && (patCache[id] = PATS[i][2]())); el.style.backgroundColor = c.bg; el.style.backgroundImage = patURL(id, c.ink, c.acc, 0.6) || 'none'; if (t && t.w > 110) el.style.backgroundSize = Math.round(t.w * 0.5) + 'px'; });
     $('#sunLine').textContent = (S.theme.auto ? 'On · ' : '') + ({ dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' })[sunPhase(Date.now())] + ' now' + (t ? ' · up ' + hm(new Date(t.rise)) + ' · down ' + hm(new Date(t.set)) : '');
+    document.querySelectorAll('#sbody [data-wx]').forEach((x) => x.classList.toggle('on', x.dataset.wx === (S.theme.wx || 'clear')));
+    const L = S.theme.live, wl = $('#wxLine');
+    wl.textContent = S.theme.wx === 'real' ? (L && L.code >= 0 ? 'Reston now: ' + (WX_TEXT[L.code] || 'Weather') + (L.temp != null ? ', ' + L.temp + '°' : '') + '. Checks every 30 minutes.' : L ? 'Couldn’t reach the weather. Showing clear; trying again soon.' : 'Checking Reston…')
+      : 'Rain and storms fall behind everything, over any theme. Real follows Reston’s actual weather.';
     $('#sunBtn').textContent = S.theme.auto ? 'Turn off' : 'Turn on'; $('#sunBtn').classList.toggle('on', !!S.theme.auto);
   }
   function themeAct(a) {
     if (a === 'surprise') { const pool = TH.filter((c) => c.g !== 'sun'); setTheme({ auto: false, color: pool[Math.floor(Math.random() * pool.length)].id, pat: Math.random() < 0.45 ? 'none' : PATS[1 + Math.floor(Math.random() * (PATS.length - 1))][0], str: Math.random() < 0.5 ? 'soft' : 'bold' }); }
-    if (a === 'reset') setTheme({ auto: false, color: 'paper', pat: 'none', str: 'soft' });
+    if (a === 'reset') setTheme({ auto: false, color: 'paper', pat: 'none', str: 'soft', wx: 'clear' });
     if (a === 'auto') setTheme({ auto: !S.theme.auto });
   }

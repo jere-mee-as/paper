@@ -10,7 +10,14 @@ if (!window.PaperNative) window.PaperNative = (function () {
   var cats = { Spotify: 'audio', 'Pocket Casts': 'audio', 'YouTube Music': 'audio', Shazam: 'audio', YouTube: 'video', Netflix: 'video', Max: 'video',
     Instagram: 'social', Discord: 'social', Reddit: 'social', X: 'social', Threads: 'social', Maps: 'maps', Gallery: 'image', Camera: 'image',
     Slack: 'productivity', Docs: 'productivity', Drive: 'productivity', Calendar: 'productivity' };
-  var apps = names.map(function (n) { var pkg = 'app.' + n.toLowerCase().replace(/[^a-z]/g, ''); return { key: pkg + '/Main', pkg: pkg, label: n, cat: cats[n] || 'other', icon: '' }; });
+  // Stand-in icons for the preview (the phone serves real ones at /icon/…). A few are left empty to show the letter fallback.
+  function fakeIcon(n) {
+    if (/^(Uber|Weather|Max)$/.test(n)) return '';
+    var h = 0; for (var i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) % 360;
+    var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(" + h + ",70%,58%)'/><stop offset='1' stop-color='hsl(" + ((h + 40) % 360) + ",70%,42%)'/></linearGradient></defs><rect width='96' height='96' fill='url(#g)'/><text x='48' y='64' font-family='sans-serif' font-size='44' font-weight='600' fill='#fff' text-anchor='middle'>" + n.charAt(0) + "</text></svg>";
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  var apps = names.map(function (n) { var pkg = 'app.' + n.toLowerCase().replace(/[^a-z]/g, ''); return { key: pkg + '/Main', pkg: pkg, label: n, cat: cats[n] || 'other', icon: fakeIcon(n) }; });
   var notifs = [
     { id: 'n1', pkg: 'app.messages', kind: 'msg', title: 'Ana', text: 'Can you bring the charger?', person: 'Ana', convo: 'Ana', group: false, time: now - 5 * MIN, live: true, canReply: true, actions: [] },
     { id: 'n2', pkg: 'app.whatsapp', kind: 'msg', title: 'Leo', text: 'pizza after? you owe me 20', person: 'Leo', convo: 'Leo', group: false, time: now - 31 * MIN, live: true, canReply: true, actions: [] },

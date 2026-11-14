@@ -34,8 +34,13 @@ Neither is on any page. Swipe down and type the name.
   - **Follow the sun** switches between Dawn, Day, Dusk and Night skies using sunrise and sunset for Reston.
   - **Sets** are ready-made pairs (Tablet, Blueprint, Arcade, Terrazzo, Night sky, Desert, Memphis, Graph paper, Picnic).
   - **Palettes**, **One color, all the way through** (light and dark of nine hues), **Loud**, and **Gradients**.
+  - **Weather** (under Follow the sun), as on jere.ing: Clear, Rain or Storm, falling behind everything over any theme, with lightning in storms. **Real** follows Reston's actual weather (rain, snow, storms) and checks every 30 minutes. The rain pauses whenever Paper isn't on screen.
   - **Patterns** go over any color, Soft or Bold: Tablet, Dots, Graph, Blueprint, Hatch, Ripples, Dunes, Stars, Terrazzo, Maze, Crosses, Confetti, Memphis, Stripes, Gingham.
   - **Surprise me** picks at random; **Back to Paper** undoes everything. Typing a color's name (`lapis`) applies it directly.
+
+## Folders
+
+On the Folders page each folder shows the names of its first apps. Open one and the apps are icons, with their names underneath. Hold an icon for its menu.
 
 ## Changing things
 

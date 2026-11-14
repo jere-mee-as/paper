@@ -334,7 +334,7 @@
     try { t[3](body.firstChild); } catch (e) { body.firstChild.innerHTML = '<p class="tsub">This one broke: ' + esc(String(e && e.message || e)) + '</p>'; }
   }
   function stopToy() { toyOffs.forEach((f) => { try { f(); } catch (e) {} }); toyOffs = []; }
-  function closeToy(quiet) { if (!toyOpen) return; stopToy(); toyOpen = ''; $('#toy').classList.remove('on'); $('#toyBody').innerHTML = ''; if (!quiet) openFun(); }
+  function closeToy(quiet) { if (!toyOpen) return; stopToy(); toyOpen = ''; applyWeather(); $('#toy').classList.remove('on'); $('#toyBody').innerHTML = ''; if (!quiet) openFun(); }
   function openFun() {
     sheetKind = 'fun';
     const groups = ['Decide', 'Fidget', 'Watch', 'Play', 'Odd'];

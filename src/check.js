@@ -14,6 +14,7 @@ const path = require('path');
   p.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   p.on('console', (m) => { if ((m.type() === 'warning' || m.type() === 'error') && !/ERR_FAILED/.test(m.text())) errors.push(m.type() + ': ' + m.text()); });
   await p.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  await p.route(/api\.open-meteo\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ current: { weather_code: 95, temperature_2m: 61.3 } }) }));
   await p.goto(file);
   await p.evaluate(() => { window.__launched = []; const f = PaperNative.launch; PaperNative.launch = (k) => { __launched.push(k); return f(k); }; });
   const cdp = await ctx.newCDPSession(p);
@@ -52,6 +53,12 @@ const path = require('path');
   // folder springs out of its tile
   await tapEl('[data-tile="1"]'); await wait(20); await shot('05-folder-opening'); await settle(); await shot('06-folder-open');
   expect((await st()).folder === 1, 'tile opens folder');
+  expect(await p.$$eval('#fview .fi .fic', (e) => e.length) >= 2 && !(await p.$('#fview .chip')), 'inside a folder: app icons');
+  expect(await p.$$eval('#fview .fi .fil', (e) => e.every((x) => x.textContent.length > 0)), 'icons keep a small name');
+  expect(await p.$$eval('#tiles .tapps span', (e) => e.length) > 4 && !(await p.$('#tiles img')), 'outside, the tiles stay names');
+  const ic = await (await p.$('#fview .fi')).boundingBox(); await touch('touchStart', ic.x + ic.width / 2, ic.y + 20); await wait(620); await touch('touchEnd'); await wait(450);
+  expect((await st()).lift && !!(await p.$('#liftItem.fi img')), 'holding an icon lifts the icon'); await shot('06b-folder-icon-held');
+  await touch('touchStart', 30, 80); await touch('touchEnd'); await wait(300);
   const fv = await (await p.$('#fview .fhead')).boundingBox();
   await swipe(fv.x + 40, fv.y + 10, fv.x + 40, fv.y + 320, 200);
   expect((await st()).folder === -1, 'drag folder down closes it');
@@ -159,6 +166,20 @@ const path = require('path');
     await p.evaluate((a) => PAPER.setTheme({ color: a[0], pat: a[1], str: a[2], auto: false }), [c, pt, s2]); await wait(850); await shot('theme-' + c + '-' + pt);
   }
   for (const pt of pats) { await p.evaluate((x) => PAPER.setTheme({ pat: x }), pt); }
+  // weather
+  await p.evaluate(() => PAPER.setTheme({ color: 'sun-night', pat: 'none', wx: 'rain' })); await wait(700);
+  let wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'rain' && wx.running && wx.drops > 20, 'rain falls ' + JSON.stringify(wx)); await shot('25-weather-rain-night');
+  await p.evaluate(() => PAPER.setTheme({ color: 'sun-day', wx: 'storm' })); await wait(3200);
+  wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'storm' && wx.running, 'storm'); await shot('26-weather-storm-day');
+  await p.evaluate(() => PAPER.openToy('coin')); await wait(200); expect(!(await p.evaluate(() => PAPER.weather())).running, 'rain pauses under a toy');
+  await p.evaluate(() => PAPER.closeToy(true)); await wait(200); expect((await p.evaluate(() => PAPER.weather())).running, 'and resumes after');
+  await p.evaluate(() => PAPER.setTheme({ wx: 'real' })); await wait(800);
+  wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'storm', 'Real: Reston thunderstorm → storm (' + wx.kind + ')');
+  await find('them'); await tapEl('#results .row'); await settle(); await wait(300);
+  const wl = await p.$eval('#wxLine', (e) => e.textContent); expect(/Thunderstorm, 61°/.test(wl), 'Real shows the conditions: ' + wl); await shot('27-themes-weather');
+  expect((await p.evaluate(() => document.querySelector('#sbody').scrollTop)) === 0, 'Themes opens at the top (' + (await p.evaluate(() => document.querySelector('#sbody').scrollTop)) + ')');
+  await tapEl('#sbody [data-wx="clear"]'); await wait(200); wx = await p.evaluate(() => PAPER.weather()); expect(!wx.kind && !wx.running, 'Clear stops the rain');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
   // follow the sun
   await p.evaluate(() => PAPER.setTheme({ auto: true, pat: 'none' })); await wait(300);
   const ph = await p.evaluate(() => PAPER.sunPhase(Date.now())); expect(['dawn', 'day', 'dusk', 'night'].includes(ph), 'sun phase ' + ph);

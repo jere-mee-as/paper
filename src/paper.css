@@ -28,6 +28,10 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #app{position:fixed;inset:0;overflow:hidden;overflow:clip;touch-action:none}
 #wall,#wallOld{position:absolute;inset:0;pointer-events:none}
 #wallOld{opacity:0}
+#wx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#bolt{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+#bolt.flash{animation:bolt 1.1s ease-out}
+@keyframes bolt{0%{opacity:0}4%{opacity:.5}10%{opacity:.05}16%{opacity:.35}100%{opacity:0}}
 #app.theming,#app.theming *{transition:color .5s,background-color .5s,border-color .5s,fill .5s,stroke .5s!important}
 #stage{position:absolute;inset:0;overflow:hidden;overflow:clip;transform-origin:50% 42%;will-change:transform,filter}
 #track{position:absolute;top:0;left:0;height:100%;width:200%;display:flex;will-change:transform}
@@ -87,6 +91,17 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .fname{font-weight:300;font-size:34px;letter-spacing:-1.2px}
 .fbody{min-height:0}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:14px}
+.ficons{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 6px;padding:4px 0 16px}
+.fi{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;text-align:center;transition:transform .22s var(--ease),opacity .22s}
+.fi:active{transform:scale(.9);opacity:.75}
+.fic{position:relative;width:60px;height:60px;border-radius:17px;overflow:hidden;background:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 0 0 .5px rgba(var(--inkRGB),.12),0 3px 10px rgba(0,0,0,.1)}
+.fic b{font-weight:400;font-size:24px;color:var(--ink2)}
+.fic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fic.add{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--ink2)}
+.fil{font-size:12.5px;line-height:1.2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#liftItem.fi{padding:0;background:none;border-radius:0;flex-direction:column;align-items:center;transform-origin:50% 40%}
+#liftItem.fi .fil{color:var(--ink)}
 .chip{min-height:48px;padding:0 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip.ghost{background:transparent;color:var(--ink);border:1px solid var(--line2)}
 
@@ -213,6 +228,8 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #app.patterned .page .app,#app.patterned #clock,#app.patterned .page>.clockrow .mono,#app.patterned .col>.mono,#app.patterned .over h1,#app.patterned .calhead .mono,#app.patterned #rail button,#app.patterned .letter{text-shadow:0 0 2px var(--bg),0 0 8px var(--bg),0 0 16px var(--bg),0 0 24px var(--bg)}
 
 /* themes folder */
+.wxseg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wxseg .btn{padding:0 6px}
 .swg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 8px}
 .sw{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;transition:transform .22s var(--ease)}
 .sw:active{transform:scale(.93)}

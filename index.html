@@ -38,6 +38,10 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #app{position:fixed;inset:0;overflow:hidden;overflow:clip;touch-action:none}
 #wall,#wallOld{position:absolute;inset:0;pointer-events:none}
 #wallOld{opacity:0}
+#wx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#bolt{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+#bolt.flash{animation:bolt 1.1s ease-out}
+@keyframes bolt{0%{opacity:0}4%{opacity:.5}10%{opacity:.05}16%{opacity:.35}100%{opacity:0}}
 #app.theming,#app.theming *{transition:color .5s,background-color .5s,border-color .5s,fill .5s,stroke .5s!important}
 #stage{position:absolute;inset:0;overflow:hidden;overflow:clip;transform-origin:50% 42%;will-change:transform,filter}
 #track{position:absolute;top:0;left:0;height:100%;width:200%;display:flex;will-change:transform}
@@ -97,6 +101,17 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .fname{font-weight:300;font-size:34px;letter-spacing:-1.2px}
 .fbody{min-height:0}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:14px}
+.ficons{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 6px;padding:4px 0 16px}
+.fi{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;text-align:center;transition:transform .22s var(--ease),opacity .22s}
+.fi:active{transform:scale(.9);opacity:.75}
+.fic{position:relative;width:60px;height:60px;border-radius:17px;overflow:hidden;background:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 0 0 .5px rgba(var(--inkRGB),.12),0 3px 10px rgba(0,0,0,.1)}
+.fic b{font-weight:400;font-size:24px;color:var(--ink2)}
+.fic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fic.add{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--ink2)}
+.fil{font-size:12.5px;line-height:1.2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#liftItem.fi{padding:0;background:none;border-radius:0;flex-direction:column;align-items:center;transform-origin:50% 40%}
+#liftItem.fi .fil{color:var(--ink)}
 .chip{min-height:48px;padding:0 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip.ghost{background:transparent;color:var(--ink);border:1px solid var(--line2)}
 
@@ -223,6 +238,8 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #app.patterned .page .app,#app.patterned #clock,#app.patterned .page>.clockrow .mono,#app.patterned .col>.mono,#app.patterned .over h1,#app.patterned .calhead .mono,#app.patterned #rail button,#app.patterned .letter{text-shadow:0 0 2px var(--bg),0 0 8px var(--bg),0 0 16px var(--bg),0 0 24px var(--bg)}
 
 /* themes folder */
+.wxseg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wxseg .btn{padding:0 6px}
 .swg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 8px}
 .sw{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;transition:transform .22s var(--ease)}
 .sw:active{transform:scale(.93)}
@@ -299,7 +316,7 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 </head>
 <body>
 <div id="app">
-  <div id="wall"></div><div id="wallOld"></div>
+  <div id="wall"></div><div id="wallOld"></div><canvas id="wx" aria-hidden="true"></canvas><div id="bolt"></div>
   <div id="stage">
     <div id="track">
       <section class="page" id="pHome" aria-label="Home">
@@ -370,7 +387,14 @@ if (!window.PaperNative) window.PaperNative = (function () {
   var cats = { Spotify: 'audio', 'Pocket Casts': 'audio', 'YouTube Music': 'audio', Shazam: 'audio', YouTube: 'video', Netflix: 'video', Max: 'video',
     Instagram: 'social', Discord: 'social', Reddit: 'social', X: 'social', Threads: 'social', Maps: 'maps', Gallery: 'image', Camera: 'image',
     Slack: 'productivity', Docs: 'productivity', Drive: 'productivity', Calendar: 'productivity' };
-  var apps = names.map(function (n) { var pkg = 'app.' + n.toLowerCase().replace(/[^a-z]/g, ''); return { key: pkg + '/Main', pkg: pkg, label: n, cat: cats[n] || 'other', icon: '' }; });
+  // Stand-in icons for the preview (the phone serves real ones at /icon/…). A few are left empty to show the letter fallback.
+  function fakeIcon(n) {
+    if (/^(Uber|Weather|Max)$/.test(n)) return '';
+    var h = 0; for (var i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) % 360;
+    var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(" + h + ",70%,58%)'/><stop offset='1' stop-color='hsl(" + ((h + 40) % 360) + ",70%,42%)'/></linearGradient></defs><rect width='96' height='96' fill='url(#g)'/><text x='48' y='64' font-family='sans-serif' font-size='44' font-weight='600' fill='#fff' text-anchor='middle'>" + n.charAt(0) + "</text></svg>";
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  var apps = names.map(function (n) { var pkg = 'app.' + n.toLowerCase().replace(/[^a-z]/g, ''); return { key: pkg + '/Main', pkg: pkg, label: n, cat: cats[n] || 'other', icon: fakeIcon(n) }; });
   var notifs = [
     { id: 'n1', pkg: 'app.messages', kind: 'msg', title: 'Ana', text: 'Can you bring the charger?', person: 'Ana', convo: 'Ana', group: false, time: now - 5 * MIN, live: true, canReply: true, actions: [] },
     { id: 'n2', pkg: 'app.whatsapp', kind: 'msg', title: 'Leo', text: 'pizza after? you owe me 20', person: 'Leo', convo: 'Leo', group: false, time: now - 31 * MIN, live: true, canReply: true, actions: [] },
@@ -434,7 +458,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.4.1';
+  const PAGE_VERSION = '0.5.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -459,7 +483,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear' }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -504,6 +528,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
   }
 
   // ------------------------------------------------------------------ helpers
+  // An app's real icon (served by the APK at /icon/…, unmasked, shaped here). Its first letter shows until it loads, or if it can't.
+  const appIcon = (a) => '<span class="fic"><b>' + esc((a.label || '?').trim().charAt(0).toUpperCase()) + '</b>' + (a.icon ? '<img src="' + esc(a.icon) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '') + '</span>';
   let toastT = 0;
   function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1600); }
   const DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -821,10 +847,16 @@ if (!window.PaperNative) window.PaperNative = (function () {
     const box = $('#lift');
     box.innerHTML = '<div id="liftItem"></div><div id="liftMenu" role="menu"></div>';
     const it = $('#liftItem');
-    it.textContent = el.textContent.trim();
-    it.style.font = getComputedStyle(el).font;
-    it.style.letterSpacing = getComputedStyle(el).letterSpacing;
-    it.style.left = (r.left - 14) + 'px'; it.style.top = (r.top - 6) + 'px'; it.style.minHeight = (r.height + 12) + 'px';
+    if (el.classList.contains('fi')) {
+      // an icon lifts as itself
+      it.className = 'fi lifted'; it.innerHTML = el.innerHTML;
+      it.style.left = r.left + 'px'; it.style.top = r.top + 'px'; it.style.width = r.width + 'px';
+    } else {
+      it.textContent = el.textContent.trim();
+      it.style.font = getComputedStyle(el).font;
+      it.style.letterSpacing = getComputedStyle(el).letterSpacing;
+      it.style.left = (r.left - 14) + 'px'; it.style.top = (r.top - 6) + 'px'; it.style.minHeight = (r.height + 12) + 'px';
+    }
     const menu = $('#liftMenu');
     menu.innerHTML = items.map((m) => '<button role="menuitem" class="mi' + (m.red ? ' red' : '') + '" data-lift="' + m.id + '"><span>' + esc(m.label) + '</span>' + (m.note ? '<span class="mn">' + esc(m.note) + '</span>' : '') + '</button>').join('');
     const below = r.bottom + 12 + items.length * 50 < H() - 20;
@@ -1005,8 +1037,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
     const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
     const v = $('#fview');
     v.innerHTML = '<div class="fhead"><span class="fname">' + esc(f.name) + '</span><span class="mono">' + apps.length + (apps.length === 1 ? ' app' : ' apps') + '</span></div>' +
-      '<div class="fbody scroll"><div class="chips">' + apps.map((a) => '<button class="chip" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + esc(a.label) + '</button>').join('') +
-      (f.auto ? '' : '<button class="chip ghost" data-addto="' + i + '">' + (apps.length ? '+ Add' : '+ Add apps') + '</button>') + '</div></div>';
+      '<div class="fbody scroll"><div class="ficons">' + apps.map((a) => '<button class="fi" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + appIcon(a) + '<span class="fil">' + esc(shortName(a.label)) + '</span></button>').join('') +
+      (f.auto ? '' : '<button class="fi" data-addto="' + i + '"><span class="fic add">' + ICON.plus + '</span><span class="fil">' + (apps.length ? 'Add' : 'Add apps') + '</span></button>') + '</div></div>';
     folderOpen = i;
     $('#fwrap').classList.add('on');
     v.style.transform = '';
@@ -1019,7 +1051,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
       v.style.opacity = String(Math.min(1, 0.4 + q));
       $('#fwrap').style.setProperty('--fb', String(Math.min(1, q)));
     });
-    stagger(v.querySelector('.chips'));
+    stagger(v.querySelector('.ficons'), 20);
   }
   function closeFolder(instant, v0) {
     if (folderOpen < 0) return;
@@ -1188,9 +1220,9 @@ if (!window.PaperNative) window.PaperNative = (function () {
   }
   function openSheet(html) {
     $('#sbody').innerHTML = html;
-    $('#sbody').scrollTop = 0;
     const sh = $('#sheet');
     if (!sheetOpen) { sh.classList.add('on'); $('#scrim').classList.add('on'); sheetY = sh.offsetHeight || H(); paintSheet(); }
+    $('#sbody').scrollTop = 0;   // after it's displayed: a hidden element ignores this and would reopen where it was left
     sheetOpen = true;
     closeRail(); closeLift();
     openSheetSpring(0);
@@ -1338,6 +1370,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     if (d.str) { setTheme({ str: d.str }); return; }
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false }); return; }
     if (d.thact) { themeAct(d.thact); return; }
+    if (d.wx) { setTheme({ wx: d.wx }); return; }
     if (d.open !== undefined) { open(d.open, d.label); return; }
     if (d.tile !== undefined) { openFolder(+d.tile); return; }
     if (d.recent !== undefined) { runRecent(+d.recent); return; }
@@ -1634,9 +1667,74 @@ if (!window.PaperNative) window.PaperNative = (function () {
     const rgb = (h) => 'rgb(' + rgbOf(h).join(',') + ')';
     themeBars = c.grad ? [rgb(c.grad[0]), rgb(c.grad[c.grad.length - 1])] : [rgb(c.bg), rgb(c.bg)];
     lastPhase = S.theme.auto ? sunPhase(Date.now()) : '';
+    wxColor = null;
   }
-  function setTheme(patch) { Object.assign(S.theme, patch); save(); applyTheme(true); markThemes(); haptic('tick'); }
-  function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } }
+
+  // ---- weather, as on jere.ing: Clear, Rain or Storm, drawn behind everything. "Real" follows Reston's actual weather.
+  // The rain only animates while Paper is on screen and nothing full-screen covers it.
+  const WX = [['clear', 'Clear'], ['rain', 'Rain'], ['storm', 'Storm'], ['real', 'Real']];
+  let wxDrops = [], wxRaf = 0, wxLast = 0, wxBoltAt = 0, wxColor = null, wxKind = '', wxFetching = false;
+  const WX_TEXT = { 0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Fog', 51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle', 56: 'Freezing drizzle', 57: 'Freezing drizzle', 61: 'Rain', 63: 'Rain', 65: 'Heavy rain',
+    66: 'Freezing rain', 67: 'Freezing rain', 71: 'Snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow', 80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm' };
+  const codeKind = (c) => (c >= 95 ? 'storm' : (c >= 51 && c <= 67) || (c >= 80 && c <= 82) ? 'rain' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snow' : 'clear');
+  function liveWeather() {
+    const L = S.theme.live;
+    if (L && Date.now() - L.at < 30 * 6e4) return L;
+    if (!wxFetching) {
+      wxFetching = true;
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=38.9586&longitude=-77.357&current=weather_code,temperature_2m&temperature_unit=fahrenheit')
+        .then((r) => r.json()).then((j) => { const c = j.current; S.theme.live = { at: Date.now(), code: c.weather_code, temp: Math.round(c.temperature_2m) }; save(); })
+        .catch(() => { S.theme.live = { at: Date.now() - 25 * 6e4, code: -1 }; })
+        .then(() => { wxFetching = false; applyWeather(); markThemes(); });
+    }
+    return L || null;
+  }
+  function weatherKind() {
+    if (S.theme.wx !== 'real') return S.theme.wx || 'clear';
+    const L = liveWeather(); return L && L.code >= 0 ? codeKind(L.code) : 'clear';
+  }
+  function wxSeed() {
+    const cv = $('#wx'), w = innerWidth, h = innerHeight, d = Math.min(2, devicePixelRatio || 1);
+    cv.width = w * d; cv.height = h * d; cv.getContext('2d').setTransform(d, 0, 0, d, 0, 0);
+    const snow = wxKind === 'snow', n = Math.round(w * h / (wxKind === 'storm' ? 5200 : snow ? 7000 : 9500));
+    wxDrops = Array.from({ length: n }, () => ({ x: Math.random() * w * 1.2, y: Math.random() * h, l: 9 + Math.random() * 12, v: snow ? 30 + Math.random() * 50 : 520 + Math.random() * 340, a: 0.35 + Math.random() * 0.65, r: 1 + Math.random() * 2.2, p: Math.random() * 6.28 }));
+  }
+  function wxFrame(t) {
+    wxRaf = 0;
+    if (!wxKind || document.hidden || toyOpen) return;
+    wxRaf = requestAnimationFrame(wxFrame);
+    if (t - wxLast < 30) return;                                 // ~30 fps is plenty for rain and kinder to the battery
+    const dt = Math.min(0.05, (t - wxLast) / 1000); wxLast = t;
+    const cv = $('#wx'), ctx = cv.getContext('2d'), w = innerWidth, h = innerHeight;
+    if (!wxColor) wxColor = cssv('--inkRGB');
+    ctx.clearRect(0, 0, w, h);
+    if (wxKind === 'snow') {
+      ctx.fillStyle = 'rgb(' + wxColor + ')';
+      wxDrops.forEach((d) => { d.y += d.v * dt; d.x += Math.sin(t / 900 + d.p) * 12 * dt; if (d.y > h + 4) { d.y = -4; d.x = Math.random() * w; } ctx.globalAlpha = d.a * 0.5; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 7); ctx.fill(); });
+    } else {
+      const slant = wxKind === 'storm' ? 0.28 : 0.16;
+      ctx.strokeStyle = 'rgb(' + wxColor + ')'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+      wxDrops.forEach((d) => { d.y += d.v * dt; d.x -= d.v * slant * dt; if (d.y > h + 20) { d.y = -20; d.x = Math.random() * w * 1.2; }
+        ctx.globalAlpha = d.a * 0.32; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.l * slant, d.y - d.l); ctx.stroke(); });
+      if (wxKind === 'storm' && t > wxBoltAt) {
+        if (wxBoltAt) { const b = $('#bolt'); b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); }
+        wxBoltAt = t + 6000 + Math.random() * 12000;
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function applyWeather() {
+    const k = weatherKind(), cv = $('#wx');
+    if (k === 'clear') { wxKind = ''; cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); cv.style.display = 'none'; return; }
+    cv.style.display = '';
+    if (k !== wxKind) { wxKind = k; wxSeed(); wxBoltAt = performance.now() + 2500; }
+    if (!wxRaf) { wxLast = performance.now(); wxRaf = requestAnimationFrame(wxFrame); }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) applyWeather(); });
+  window.addEventListener('resize', () => { if (wxKind) wxSeed(); });
+
+  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); markThemes(); haptic('tick'); }
+  function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
   const SETS = [['Tablet', 'lapis', 'wedges', 'bold'], ['Blueprint', 'blueprint', 'blueprint', 'bold'], ['Arcade', 'arcade', 'maze', 'soft'], ['Terrazzo', 'sand', 'terrazzo', 'bold'], ['Night sky', 'sun-night', 'stars', 'bold'],
@@ -1646,7 +1744,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
   function openThemes() {
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
-      '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div></div>' +
+      '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div>' +
+      '<p class="mono" style="margin:18px 0 8px">Weather</p><div class="wxseg">' + WX.map(([k, n]) => '<button class="btn sm" data-wx="' + k + '">' + n + '</button>').join('') + '</div><p class="hint" id="wxLine" style="margin:8px 0 0"></p></div>' +
       '<div class="grp"><p class="mono">Sets</p><div class="btnrow" style="margin-top:0">' + SETS.map((s, i) => '<button class="btn sm" data-set="' + i + '">' + s[0] + '</button>').join('') + '</div></div>' +
       '<div class="grp"><p class="mono">Palettes</p>' + group('pal') + '</div>' +
       '<div class="grp"><p class="mono">One color, all the way through</p>' + group('mono') + '</div>' +
@@ -1663,11 +1762,15 @@ if (!window.PaperNative) window.PaperNative = (function () {
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');
     $('#patGrid').querySelectorAll('.swp').forEach((el, i) => { const id = PATS[i][0], t = patCache[id] || (PATS[i][2] && (patCache[id] = PATS[i][2]())); el.style.backgroundColor = c.bg; el.style.backgroundImage = patURL(id, c.ink, c.acc, 0.6) || 'none'; if (t && t.w > 110) el.style.backgroundSize = Math.round(t.w * 0.5) + 'px'; });
     $('#sunLine').textContent = (S.theme.auto ? 'On · ' : '') + ({ dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' })[sunPhase(Date.now())] + ' now' + (t ? ' · up ' + hm(new Date(t.rise)) + ' · down ' + hm(new Date(t.set)) : '');
+    document.querySelectorAll('#sbody [data-wx]').forEach((x) => x.classList.toggle('on', x.dataset.wx === (S.theme.wx || 'clear')));
+    const L = S.theme.live, wl = $('#wxLine');
+    wl.textContent = S.theme.wx === 'real' ? (L && L.code >= 0 ? 'Reston now: ' + (WX_TEXT[L.code] || 'Weather') + (L.temp != null ? ', ' + L.temp + '°' : '') + '. Checks every 30 minutes.' : L ? 'Couldn’t reach the weather. Showing clear; trying again soon.' : 'Checking Reston…')
+      : 'Rain and storms fall behind everything, over any theme. Real follows Reston’s actual weather.';
     $('#sunBtn').textContent = S.theme.auto ? 'Turn off' : 'Turn on'; $('#sunBtn').classList.toggle('on', !!S.theme.auto);
   }
   function themeAct(a) {
     if (a === 'surprise') { const pool = TH.filter((c) => c.g !== 'sun'); setTheme({ auto: false, color: pool[Math.floor(Math.random() * pool.length)].id, pat: Math.random() < 0.45 ? 'none' : PATS[1 + Math.floor(Math.random() * (PATS.length - 1))][0], str: Math.random() < 0.5 ? 'soft' : 'bold' }); }
-    if (a === 'reset') setTheme({ auto: false, color: 'paper', pat: 'none', str: 'soft' });
+    if (a === 'reset') setTheme({ auto: false, color: 'paper', pat: 'none', str: 'soft', wx: 'clear' });
     if (a === 'auto') setTheme({ auto: !S.theme.auto });
   }
 
@@ -2007,7 +2110,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     try { t[3](body.firstChild); } catch (e) { body.firstChild.innerHTML = '<p class="tsub">This one broke: ' + esc(String(e && e.message || e)) + '</p>'; }
   }
   function stopToy() { toyOffs.forEach((f) => { try { f(); } catch (e) {} }); toyOffs = []; }
-  function closeToy(quiet) { if (!toyOpen) return; stopToy(); toyOpen = ''; $('#toy').classList.remove('on'); $('#toyBody').innerHTML = ''; if (!quiet) openFun(); }
+  function closeToy(quiet) { if (!toyOpen) return; stopToy(); toyOpen = ''; applyWeather(); $('#toy').classList.remove('on'); $('#toyBody').innerHTML = ''; if (!quiet) openFun(); }
   function openFun() {
     sheetKind = 'fun';
     const groups = ['Decide', 'Fidget', 'Watch', 'Play', 'Odd'];
@@ -2036,7 +2139,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     themes() { return TH.map((c) => { const d = derive(c); return { id: c.id, n: c.n, g: c.g, ink: +d.inkMin.toFixed(2), ink2: +d.ink2Min.toFixed(2) }; }); },
     patterns() { return PATS.map((x) => x[0]); },
     toys() { return TOYS.map((t) => t[0]); },
-    setTheme, openToy, closeToy, sunPhase, sunTimes
+    setTheme, openToy, closeToy, sunPhase, sunTimes, weather() { return { kind: wxKind, drops: wxDrops.length, running: !!wxRaf }; }
   };
 
   // ------------------------------------------------------------------ start
@@ -2044,7 +2147,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   else { document.documentElement.style.setProperty('--top', '0px'); document.documentElement.style.setProperty('--bot', '0px'); }
   // Nothing may scroll the frame itself (focus or scroll-into-view would shift every page under the finger).
   ['#app', '#stage', '#pHome', '#pFold'].forEach((sel) => { const el = $(sel); el.addEventListener('scroll', () => { if (el.scrollLeft || el.scrollTop) { el.scrollLeft = 0; el.scrollTop = 0; } }); });
-  applyTheme(false);
+  applyTheme(false); applyWeather();
   loadApps(); loadEvents();
   renderHome(); renderCal(); renderFolders(); renderNow();
   paint();

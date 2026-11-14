@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.4.1';
+  const PAGE_VERSION = '0.5.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -33,7 +33,7 @@
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear' }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -78,6 +78,8 @@
   }
 
   // ------------------------------------------------------------------ helpers
+  // An app's real icon (served by the APK at /icon/…, unmasked, shaped here). Its first letter shows until it loads, or if it can't.
+  const appIcon = (a) => '<span class="fic"><b>' + esc((a.label || '?').trim().charAt(0).toUpperCase()) + '</b>' + (a.icon ? '<img src="' + esc(a.icon) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '') + '</span>';
   let toastT = 0;
   function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1600); }
   const DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -395,10 +397,16 @@
     const box = $('#lift');
     box.innerHTML = '<div id="liftItem"></div><div id="liftMenu" role="menu"></div>';
     const it = $('#liftItem');
-    it.textContent = el.textContent.trim();
-    it.style.font = getComputedStyle(el).font;
-    it.style.letterSpacing = getComputedStyle(el).letterSpacing;
-    it.style.left = (r.left - 14) + 'px'; it.style.top = (r.top - 6) + 'px'; it.style.minHeight = (r.height + 12) + 'px';
+    if (el.classList.contains('fi')) {
+      // an icon lifts as itself
+      it.className = 'fi lifted'; it.innerHTML = el.innerHTML;
+      it.style.left = r.left + 'px'; it.style.top = r.top + 'px'; it.style.width = r.width + 'px';
+    } else {
+      it.textContent = el.textContent.trim();
+      it.style.font = getComputedStyle(el).font;
+      it.style.letterSpacing = getComputedStyle(el).letterSpacing;
+      it.style.left = (r.left - 14) + 'px'; it.style.top = (r.top - 6) + 'px'; it.style.minHeight = (r.height + 12) + 'px';
+    }
     const menu = $('#liftMenu');
     menu.innerHTML = items.map((m) => '<button role="menuitem" class="mi' + (m.red ? ' red' : '') + '" data-lift="' + m.id + '"><span>' + esc(m.label) + '</span>' + (m.note ? '<span class="mn">' + esc(m.note) + '</span>' : '') + '</button>').join('');
     const below = r.bottom + 12 + items.length * 50 < H() - 20;
@@ -579,8 +587,8 @@
     const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
     const v = $('#fview');
     v.innerHTML = '<div class="fhead"><span class="fname">' + esc(f.name) + '</span><span class="mono">' + apps.length + (apps.length === 1 ? ' app' : ' apps') + '</span></div>' +
-      '<div class="fbody scroll"><div class="chips">' + apps.map((a) => '<button class="chip" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + esc(a.label) + '</button>').join('') +
-      (f.auto ? '' : '<button class="chip ghost" data-addto="' + i + '">' + (apps.length ? '+ Add' : '+ Add apps') + '</button>') + '</div></div>';
+      '<div class="fbody scroll"><div class="ficons">' + apps.map((a) => '<button class="fi" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + appIcon(a) + '<span class="fil">' + esc(shortName(a.label)) + '</span></button>').join('') +
+      (f.auto ? '' : '<button class="fi" data-addto="' + i + '"><span class="fic add">' + ICON.plus + '</span><span class="fil">' + (apps.length ? 'Add' : 'Add apps') + '</span></button>') + '</div></div>';
     folderOpen = i;
     $('#fwrap').classList.add('on');
     v.style.transform = '';
@@ -593,7 +601,7 @@
       v.style.opacity = String(Math.min(1, 0.4 + q));
       $('#fwrap').style.setProperty('--fb', String(Math.min(1, q)));
     });
-    stagger(v.querySelector('.chips'));
+    stagger(v.querySelector('.ficons'), 20);
   }
   function closeFolder(instant, v0) {
     if (folderOpen < 0) return;
@@ -762,9 +770,9 @@
   }
   function openSheet(html) {
     $('#sbody').innerHTML = html;
-    $('#sbody').scrollTop = 0;
     const sh = $('#sheet');
     if (!sheetOpen) { sh.classList.add('on'); $('#scrim').classList.add('on'); sheetY = sh.offsetHeight || H(); paintSheet(); }
+    $('#sbody').scrollTop = 0;   // after it's displayed: a hidden element ignores this and would reopen where it was left
     sheetOpen = true;
     closeRail(); closeLift();
     openSheetSpring(0);
@@ -912,6 +920,7 @@
     if (d.str) { setTheme({ str: d.str }); return; }
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false }); return; }
     if (d.thact) { themeAct(d.thact); return; }
+    if (d.wx) { setTheme({ wx: d.wx }); return; }
     if (d.open !== undefined) { open(d.open, d.label); return; }
     if (d.tile !== undefined) { openFolder(+d.tile); return; }
     if (d.recent !== undefined) { runRecent(+d.recent); return; }
@@ -1014,7 +1023,7 @@
     themes() { return TH.map((c) => { const d = derive(c); return { id: c.id, n: c.n, g: c.g, ink: +d.inkMin.toFixed(2), ink2: +d.ink2Min.toFixed(2) }; }); },
     patterns() { return PATS.map((x) => x[0]); },
     toys() { return TOYS.map((t) => t[0]); },
-    setTheme, openToy, closeToy, sunPhase, sunTimes
+    setTheme, openToy, closeToy, sunPhase, sunTimes, weather() { return { kind: wxKind, drops: wxDrops.length, running: !!wxRaf }; }
   };
 
   // ------------------------------------------------------------------ start
@@ -1022,7 +1031,7 @@
   else { document.documentElement.style.setProperty('--top', '0px'); document.documentElement.style.setProperty('--bot', '0px'); }
   // Nothing may scroll the frame itself (focus or scroll-into-view would shift every page under the finger).
   ['#app', '#stage', '#pHome', '#pFold'].forEach((sel) => { const el = $(sel); el.addEventListener('scroll', () => { if (el.scrollLeft || el.scrollTop) { el.scrollLeft = 0; el.scrollTop = 0; } }); });
-  applyTheme(false);
+  applyTheme(false); applyWeather();
   loadApps(); loadEvents();
   renderHome(); renderCal(); renderFolders(); renderNow();
   paint();
