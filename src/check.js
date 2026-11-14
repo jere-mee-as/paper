@@ -55,6 +55,8 @@ const path = require('path');
   expect((await st()).folder === 1, 'tile opens folder');
   expect(await p.$$eval('#fview .fi .fic', (e) => e.length) >= 2 && !(await p.$('#fview .chip')), 'inside a folder: app icons');
   expect(await p.$$eval('#fview .fi .fil', (e) => e.every((x) => x.textContent.length > 0)), 'icons keep a small name');
+  const al = await p.evaluate(() => { const v = document.querySelector('#fview'), n = v.querySelector('.fname').getBoundingClientRect(), i = v.querySelector('.fi .fic').getBoundingClientRect(), g = v.querySelector('.ficons').getBoundingClientRect(), h = v.querySelector('.fhead .mono').getBoundingClientRect(); return [n.left, i.left, g.right, h.right]; });
+  expect(Math.abs(al[0] - al[1]) < 4 && Math.abs(al[2] - al[3]) < 2, 'first icon lines up with the folder name, the grid with the count (' + al.map(Math.round) + ')');
   expect(await p.$$eval('#tiles .tapps span', (e) => e.length) > 4 && !(await p.$('#tiles img')), 'outside, the tiles stay names');
   const ic = await (await p.$('#fview .fi')).boundingBox(); await touch('touchStart', ic.x + ic.width / 2, ic.y + 20); await wait(620); await touch('touchEnd'); await wait(450);
   expect((await st()).lift && !!(await p.$('#liftItem.fi img')), 'holding an icon lifts the icon'); await shot('06b-folder-icon-held');
@@ -98,7 +100,7 @@ const path = require('path');
   const mpos = await p.evaluate(() => JSON.parse(PaperNative.media()).position);
   expect(Math.abs(mpos - 240000 * 0.26) < 4000 && (await st()).over === 'now', 'drag the bar seeks to ~1:02 and Now stays open (' + mpos + ')');
   await tapEl('#nowlist [data-media="toggle"]'); await wait(80);
-  expect((await p.$eval('#nowlist [data-media="toggle"]', (e) => e.getAttribute('aria-label'))) === 'Play', 'pause flips at once');
+  expect((await p.$eval('#nowlist [data-media="toggle"]', (e) => e.getAttribute('aria-label'))) === 'Play', 'pause flips at once (' + (await p.$eval('#nowlist [data-media="toggle"]', (e) => e.getAttribute('aria-label'))) + ', playing ' + (await p.evaluate(() => JSON.parse(PaperNative.media()).playing)) + ')');
   await wait(700); expect(/Paused/.test(await p.$eval('#nowlist .mcard .mono', (e) => e.textContent)), 'and the card says Paused');
   await tapEl('#nowlist [data-media="next"]'); await wait(700);
   expect((await p.$eval('#nowlist .mcard .ti', (e) => e.textContent)) === 'Night drive, side A', 'next track');
@@ -209,6 +211,35 @@ const path = require('path');
     await p.evaluate((a) => PAPER.setTheme({ color: a[0], pat: a[1], str: a[2], auto: false }), [c, pt, s2]); await wait(850); await shot('theme-' + c + '-' + pt);
   }
   for (const pt of pats) { await p.evaluate((x) => PAPER.setTheme({ pat: x }), pt); }
+  // SHELL themes, one-color-per-page themes, fonts
+  expect(th.filter((t) => t.g === 'shell').length === 9 && th.filter((t) => t.g === 'tri').length === 9, 'SHELL and per-page groups');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  for (const id of ['s-ember', 's-ice', 's-void']) { await p.evaluate((x) => PAPER.setTheme({ color: x, pat: 'none', font: 'shell' }), id); await wait(800); await shot('28-' + id + '-home'); }
+  await swipe(180, 700, 180, 400, 200); await shot('29-s-void-now'); await swipe(180, 200, 180, 600, 200);
+  await p.evaluate(() => PAPER.setTheme({ color: 's-ember', pat: 'scan', str: 'bold', font: 'shell' })); await wait(800); await shot('30-shell-scanlines');
+  await p.evaluate(() => PAPER.setTheme({ color: 'tri-fruit', pat: 'none', font: 'paper' })); await wait(800);
+  const wallC = () => p.evaluate(() => getComputedStyle(document.getElementById('wall')).backgroundColor);
+  const cHome = await wallC(); await shot('31-tri-home');
+  await swipe(330, 450, 60, 450); const cFold = await wallC(); await shot('32-tri-folders');
+  await swipe(60, 450, 330, 450); await swipe(60, 450, 330, 450); const cCal = await wallC(); await shot('33-tri-calendar');
+  expect(cHome !== cFold && cHome !== cCal && cFold !== cCal, 'each page its own color: ' + [cCal, cHome, cFold]);
+  expect(cFold === 'rgb(213, 240, 198)' && cCal === 'rgb(255, 214, 194)', 'Fruit: peach calendar, lemon home, lime folders');
+  await touch('touchStart', 300, 450); for (let i = 1; i <= 6; i++) { await touch('touchMove', 300 - i * 25, 450); await wait(16); }
+  const cMid = await wallC(); await shot('34-tri-mid-swipe'); await touch('touchEnd'); await settle();
+  expect(cMid !== cCal && cMid !== cHome, 'blends mid-swipe (' + cMid + ')');
+  expect((await p.evaluate(() => PAPER.bars()))[0].replace(/ /g, '') === (await wallC()).replace(/ /g, ''), 'bars follow the page color');
+  if (Math.round((await st()).hx) !== 0) await swipe(330, 450, 60, 450);
+  const fonts = ['paper', 'shell', 'serif', 'editorial', 'grotesk', 'rounded', 'typewriter', 'terminal', 'system'];
+  for (const f of fonts) { await p.evaluate((x) => PAPER.setTheme({ color: 'paper', pat: 'none', font: x }), f); await wait(250); expect((await p.evaluate(() => document.documentElement.dataset.font)) === f, 'font ' + f);
+    const cut = await p.evaluate(async () => { await document.fonts.ready; return [...document.querySelectorAll('#cols .app')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent); });
+    expect(!cut.length, 'font ' + f + ': every Home name fits (' + cut + ')'); }
+  await p.evaluate(() => PAPER.setTheme({ color: 'sand', font: 'serif' })); await wait(700); await shot('35-font-serif');
+  await p.evaluate(() => PAPER.setTheme({ color: 'news', font: 'editorial' })); await wait(700); await shot('36-font-editorial');
+  await p.evaluate(() => PAPER.setTheme({ color: 'terminal', pat: 'scan', font: 'terminal' })); await wait(700); await shot('37-font-terminal');
+  await find('them'); await tapEl('#results .row'); await settle(); await p.evaluate(() => document.querySelector('[data-font]').scrollIntoView({ block: 'center' })); await wait(400); await shot('38-themes-fonts');
+  await p.evaluate(() => document.querySelector('[data-color="s-ember"]').scrollIntoView({ block: 'center' })); await wait(300); await shot('39-themes-shell-tri');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  await p.evaluate(() => PAPER.setTheme({ color: 'paper', pat: 'none', font: 'paper' })); await wait(300);
   // weather
   await p.evaluate(() => PAPER.setTheme({ color: 'sun-night', pat: 'none', wx: 'rain' })); await wait(700);
   let wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'rain' && wx.running && wx.drops > 20, 'rain falls ' + JSON.stringify(wx)); await shot('25-weather-rain-night');

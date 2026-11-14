@@ -69,9 +69,29 @@
   T('sun', 'sun-day', 'Day', null, '#13202B', '#C4551F', ['#BFDDF5', '#DDEBF3', '#F1EEE4']);
   T('sun', 'sun-dusk', 'Dusk', null, '#F6E9DF', '#FFB86B', ['#1E1A3E', '#4A2452', '#8E3B3B', '#2A1620']);
   T('sun', 'sun-night', 'Night', null, '#E6EAF5', '#8FB8FF', ['#0A1030', '#070B1E', '#04050C']);
+  // SHELL's themes, as in SHELL: the accent at the top falling through a darker accent into black, a grey band at the very bottom, grain.
+  // Text is judged against the top three (the grey band holds only the dots and the frosted dock, which go dark on these themes).
+  [['ember', '#b65424', '#7d3716'], ['mono', '#0a0a0a', '#0a0a0a'], ['dusk', '#5a4a8c', '#33295a'], ['moss', '#566a35', '#303d1d'], ['ice', '#3f6f8c', '#234458'],
+    ['blood', '#8f2222', '#571212'], ['gold', '#8f6b14', '#5a430c'], ['rose', '#a8546c', '#6a3042'], ['void', '#0a0a0a', '#0a0a0a', '#0d0d0d', '#161616']].forEach(([id, a, a2, g2, g]) => {
+    if (ratio(a, '#f5f3ef') < 4.6) a = mix(a, '#000000', 0.07);   // ember and gold sit just under 4.5:1 with SHELL's ink; a hair darker
+    T('shell', 's-' + id, id.charAt(0).toUpperCase() + id.slice(1), '#0a0a0a', '#f5f3ef', id === 'mono' || id === 'void' ? '#d9d6cf' : mix(a, '#ffffff', 0.38), [a, a, a2, '#0a0a0a', '#0a0a0a', g2 || '#8d8d8a', g || '#aaaaa6']);
+    const c = TH[TH.length - 1]; c.pos = [0, 14, 36, 55, 74, 90, 100]; c.text = [a, a2, '#0a0a0a']; c.shell = true;
+  });
+  // One color per page: Calendar, Home, Folders. The background slides from one to the next as you swipe.
+  [['tri-neapolitan', 'Neapolitan', ['#F3D3D8', '#F6EEDF', '#E2CDB9'], '#2A1A14', '#B5532A'],
+    ['tri-fruit', 'Fruit', ['#FFD6C2', '#FFF0B3', '#D5F0C6'], '#1F1A10', '#C2410C'],
+    ['tri-pastel', 'Pastel', ['#DCE5FF', '#EFE3FF', '#D8F3E8'], '#161A2E', '#C2410C'],
+    ['tri-earth', 'Earth', ['#E9D3C4', '#EADFC8', '#D9E2D3'], '#22201A', '#1F6F6B'],
+    ['tri-sea', 'Sea', ['#CDE8F0', '#E4F1EC', '#D3DDF2'], '#0E1E28', '#D2552B'],
+    ['tri-loud', 'Loud three', ['#2438E0', '#A21359', '#0B6E4F'], '#FFFFFF', '#FFD84A'],
+    ['tri-night', 'Night three', ['#0B1426', '#2A1433', '#0F2A1E'], '#EDE8F5', '#F2B544'],
+    ['tri-shell', 'SHELL three', ['#7d3716', '#33295a', '#303d1d'], '#f5f3ef', '#F2B544'],
+    ['tri-candy', 'Candy', ['#FF8FB8', '#FFD23F', '#5FE0D0'], '#1A0E14', '#3B2A9A']].forEach(([id, n, P, ink, acc]) => {
+    T('tri', id, n, P[1], ink, acc); TH[TH.length - 1].pages = P;
+  });
 
   function derive(c) {
-    const stops = c.grad || [c.bg];
+    const stops = c.text || c.pages || c.grad || [c.bg];
     const worst = stops.reduce((w, s) => (ratio(c.ink, s) < ratio(c.ink, w) ? s : w), stops[0]);
     let t = 0.42, ink2 = c.ink;
     do { ink2 = mix(c.ink, worst, Math.max(0, t)); t -= 0.04; } while (ratio(ink2, worst) < 4.6 && t > -0.05);
@@ -85,9 +105,10 @@
         '--card': dark ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.5)',
         '--pop': dark ? mix(c.bg, '#FFFFFF', 0.14) : mix(c.bg, '#FFFFFF', 0.72),
         '--sheet': dark ? mix(c.bg, '#FFFFFF', 0.08) : mix(c.bg, '#FFFFFF', 0.45),
-        '--glass': dark ? 'rgba(255,255,255,.09)' : 'rgba(255,255,255,.58)',
+        '--glass': c.shell ? 'rgba(14,14,14,.62)' : dark ? 'rgba(255,255,255,.09)' : 'rgba(255,255,255,.58)',
         '--glassEdge': dark ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.75)',
         '--chipGlass': dark ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.65)',
+        '--card': c.shell ? 'rgba(20,20,20,.72)' : dark ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.5)',
         '--red': dark ? '#FF7B6E' : '#B42318'
       }
     };
@@ -155,6 +176,7 @@
       return { w: 260, h: 260, body: o };
     }],
     ['stripes', 'Stripes', () => ({ w: 36, h: 36, body: "<rect width='18' height='36' fill='{c}'/>", k: 0.5 })],
+    ['scan', 'Scanlines', () => ({ w: 6, h: 3, body: "<rect y='2' width='6' height='1' fill='#000'/>", k: 2.2 })],
     ['gingham', 'Gingham', () => ({ w: 32, h: 32, body: "<rect width='16' height='32' fill='{c}'/><rect width='32' height='16' fill='{c}'/>", k: 0.4 })]
   ];
   const patCache = {};
@@ -166,7 +188,8 @@
   }
   const GRAIN = 'url("data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='220' height='220' filter='url(#n)' opacity='.55'/></svg>") + '")';
   const STRENGTH = { soft: 0.11, bold: 0.3 };
-  const gradCSS = (c) => (c.grad ? 'linear-gradient(' + (c.ang || 180) + 'deg,' + c.grad.join(',') + ')' : c.bg);
+  const gradCSS = (c) => (c.grad ? 'linear-gradient(' + (c.ang || 180) + 'deg,' + c.grad.map((g, i) => g + (c.pos ? ' ' + c.pos[i] + '%' : '')).join(',') + ')'
+    : c.pages ? 'linear-gradient(90deg,' + c.pages[0] + ' 0 33.4%,' + c.pages[1] + ' 33.4% 66.6%,' + c.pages[2] + ' 66.6%)' : c.bg);
 
   // ---- the sun: sunrise and sunset for Reston, VA, so the sky themes can follow the day
   function sunUT(d, lat, lon, rise) {
@@ -195,7 +218,15 @@
   }
 
   // ---- applying
-  let themeBars = ['rgb(236,233,226)', 'rgb(236,233,226)'], lastPhase = '';
+  let themeBars = ['rgb(236,233,226)', 'rgb(236,233,226)'], lastPhase = '', PAGEBG = null, lastTint = '';
+  // Three-color themes: the wall follows the page you're on, blending as you swipe (called from paint()).
+  function pageTint(h) {
+    if (!PAGEBG) return;
+    const v = wide() ? 0 : Math.max(-1, Math.min(1, h)), col = v < 0 ? mix(PAGEBG[1], PAGEBG[0], -v) : mix(PAGEBG[1], PAGEBG[2], v);
+    if (col === lastTint) return; lastTint = col;
+    $('#wall').style.backgroundColor = col; document.body.style.background = col;
+    const r = 'rgb(' + rgbOf(col).join(',') + ')'; themeBars = [r, r];
+  }
   const themeColor = () => (S.theme.auto ? TH.find((c) => c.id === 'sun-' + sunPhase(Date.now())) : TH.find((c) => c.id === S.theme.color)) || TH[0];
   function applyTheme(animate) {
     const c = themeColor(), d = derive(c), st = document.documentElement.style, wall = $('#wall'), old = $('#wallOld');
@@ -209,12 +240,15 @@
     if (pat) { layers.push(pat); blend.push('normal'); }
     if (c.grad) { layers.push(GRAIN, gradCSS(c)); blend.push('overlay', 'normal'); }
     $('#app').classList.toggle('patterned', !!pat);
+    $('#app').classList.toggle('shellish', !!c.shell);
     wall.style.backgroundColor = c.bg; wall.style.backgroundImage = layers.join(',') || 'none'; wall.style.backgroundBlendMode = blend.join(',') || 'normal';
     document.body.style.background = c.bg;
     const rgb = (h) => 'rgb(' + rgbOf(h).join(',') + ')';
     themeBars = c.grad ? [rgb(c.grad[0]), rgb(c.grad[c.grad.length - 1])] : [rgb(c.bg), rgb(c.bg)];
     lastPhase = S.theme.auto ? sunPhase(Date.now()) : '';
     wxColor = null;
+    PAGEBG = c.pages || null; lastTint = ''; if (PAGEBG) pageTint(typeof hx === 'number' ? hx : 0);
+    applyFont();
   }
 
   // ---- weather, as on jere.ing: Clear, Rain or Storm, drawn behind everything. "Real" follows Reston's actual weather.
@@ -280,15 +314,44 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) applyWeather(); });
   window.addEventListener('resize', () => { if (wxKind) wxSeed(); });
 
+  // ---- fonts
+  const FONTS = [
+    ['paper', 'Paper', "Inter,system-ui,'Roboto',sans-serif", "'IBM Plex Mono',ui-monospace,monospace", ''],
+    ['shell', 'SHELL', "'JetBrains Mono',ui-monospace,monospace", "'JetBrains Mono',ui-monospace,monospace", 'JetBrains+Mono:wght@100;200;300;400;500'],
+    ['serif', 'Serif', "Fraunces,Georgia,serif", "'IBM Plex Mono',ui-monospace,monospace", 'Fraunces:opsz,wght@9..144,200;9..144,300;9..144,400;9..144,500'],
+    ['editorial', 'Editorial', "'Instrument Serif',Georgia,serif", "'IBM Plex Mono',ui-monospace,monospace", 'Instrument+Serif'],
+    ['grotesk', 'Grotesk', "'Space Grotesk',system-ui,sans-serif", "'Space Mono',ui-monospace,monospace", 'Space+Grotesk:wght@300;400;500;600&family=Space+Mono'],
+    ['rounded', 'Rounded', "Nunito,system-ui,sans-serif", "'IBM Plex Mono',ui-monospace,monospace", 'Nunito:wght@200;300;400;500;600'],
+    ['typewriter', 'Typewriter', "'Courier Prime','Courier New',monospace", "'Courier Prime','Courier New',monospace", 'Courier+Prime:wght@400;700'],
+    ['terminal', 'Terminal', "VT323,ui-monospace,monospace", "VT323,ui-monospace,monospace", 'VT323'],
+    ['system', 'System', "system-ui,'Roboto',sans-serif", "ui-monospace,'Roboto Mono',monospace", '']
+  ];
+  // Fonts whose letters run small or large get nudged to the same x-height as Inter, so nothing reflows.
+  const FSA = { editorial: 0.56, terminal: 0.56, typewriter: 0.52 };
+  // Monospace fonts are wider: Home's app names shrink a little so the two columns never collide.
+  const FS = { shell: 0.8, typewriter: 0.82, terminal: 0.9, grotesk: 0.96 };
+  function loadFont(f) {
+    if (!f[4] || document.getElementById('font-' + f[0])) return;
+    const l = document.createElement('link'); l.id = 'font-' + f[0]; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=' + f[4] + '&display=swap'; document.head.appendChild(l);
+  }
+  function applyFont() {
+    const f = FONTS.find((x) => x[0] === S.theme.font) || FONTS[0], st = document.documentElement.style;
+    loadFont(f); st.setProperty('--sans', f[2]); st.setProperty('--mono', f[3]);
+    st.setProperty('font-size-adjust', FSA[f[0]] ? String(FSA[f[0]]) : 'none');
+    st.setProperty('--fs', String(FS[f[0]] || 1));
+    document.documentElement.dataset.font = f[0];
+  }
   function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); markThemes(); haptic('tick'); }
   function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
   const SETS = [['Tablet', 'lapis', 'wedges', 'bold'], ['Blueprint', 'blueprint', 'blueprint', 'bold'], ['Arcade', 'arcade', 'maze', 'soft'], ['Terrazzo', 'sand', 'terrazzo', 'bold'], ['Night sky', 'sun-night', 'stars', 'bold'],
-    ['Desert', 'g-dune', 'dunes', 'bold'], ['Memphis', 'butter', 'memphis', 'bold'], ['Graph paper', 'news', 'grid', 'soft'], ['Picnic', 'm-red', 'gingham', 'soft'], ['Paper', 'paper', 'none', 'soft']];
+    ['Desert', 'g-dune', 'dunes', 'bold'], ['Memphis', 'butter', 'memphis', 'bold'], ['Graph paper', 'news', 'grid', 'soft'], ['Picnic', 'm-red', 'gingham', 'soft'], ['Paper', 'paper', 'none', 'soft'], ['SHELL', 's-ember', 'none', 'soft', 'shell'], ['Terminal', 'terminal', 'scan', 'bold', 'terminal'], ['Newspaper', 'news', 'none', 'soft', 'editorial']];
   const swatch = (c) => '<button class="sw" data-color="' + c.id + '"><span class="swp" style="background:' + gradCSS(c) + ';color:' + c.ink + '">Aa<i style="background:' + c.acc + '"></i></span><span class="swn">' + esc(c.n) + '</span></button>';
   const group = (g) => '<div class="swg">' + TH.filter((c) => c.g === g).map(swatch).join('') + '</div>';
   function openThemes() {
+    FONTS.forEach(loadFont);   // so the font tiles show themselves
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
       '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div>' +
@@ -298,6 +361,9 @@
       '<div class="grp"><p class="mono">One color, all the way through</p>' + group('mono') + '</div>' +
       '<div class="grp"><p class="mono">Loud</p>' + group('loud') + '</div>' +
       '<div class="grp"><p class="mono">Gradients</p>' + group('grad') + '</div>' +
+      '<div class="grp"><p class="mono">SHELL</p>' + group('shell') + '</div>' +
+      '<div class="grp"><p class="mono">A color for each page</p><p class="hint" style="margin:0 0 10px">Calendar, Home and Folders each get their own; it blends as you swipe.</p>' + group('tri') + '</div>' +
+      '<div class="grp"><p class="mono">Fonts</p><div class="swg fontg">' + FONTS.map((f) => '<button class="sw" data-font="' + f[0] + '"><span class="swp fsw" style="font-family:' + esc(f[2]) + '">Aa</span><span class="swn">' + f[1] + '</span></button>').join('') + '</div></div>' +
       '<div class="grp"><p class="mono">Patterns · over any color</p><div class="seg" style="margin-bottom:12px"><button class="btn sm" data-str="soft">Soft</button><button class="btn sm" data-str="bold">Bold</button></div><div class="swg" id="patGrid"></div></div>');
     markThemes();
   }
@@ -306,6 +372,7 @@
     const c = themeColor(), t = sunTimes(new Date());
     document.querySelectorAll('#sbody [data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === c.id));
     document.querySelectorAll('#sbody [data-str]').forEach((b) => b.classList.toggle('on', b.dataset.str === S.theme.str));
+    document.querySelectorAll('#sbody [data-font]').forEach((b) => b.classList.toggle('on', b.dataset.font === (S.theme.font || 'paper')));
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');
     $('#patGrid').querySelectorAll('.swp').forEach((el, i) => { const id = PATS[i][0], t = patCache[id] || (PATS[i][2] && (patCache[id] = PATS[i][2]())); el.style.backgroundColor = c.bg; el.style.backgroundImage = patURL(id, c.ink, c.acc, 0.6) || 'none'; if (t && t.w > 110) el.style.backgroundSize = Math.round(t.w * 0.5) + 'px'; });
     $('#sunLine').textContent = (S.theme.auto ? 'On · ' : '') + ({ dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' })[sunPhase(Date.now())] + ' now' + (t ? ' · up ' + hm(new Date(t.rise)) + ' · down ' + hm(new Date(t.set)) : '');
@@ -317,6 +384,6 @@
   }
   function themeAct(a) {
     if (a === 'surprise') { const pool = TH.filter((c) => c.g !== 'sun'); setTheme({ auto: false, color: pool[Math.floor(Math.random() * pool.length)].id, pat: Math.random() < 0.45 ? 'none' : PATS[1 + Math.floor(Math.random() * (PATS.length - 1))][0], str: Math.random() < 0.5 ? 'soft' : 'bold' }); }
-    if (a === 'reset') setTheme({ auto: false, color: 'paper', pat: 'none', str: 'soft', wx: 'clear' });
+    if (a === 'reset') setTheme({ auto: false, color: 'paper', pat: 'none', str: 'soft', wx: 'clear', font: 'paper' });
     if (a === 'auto') setTheme({ auto: !S.theme.auto });
   }

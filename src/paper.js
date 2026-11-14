@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.6.1';
+  const PAGE_VERSION = '0.7.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -33,7 +33,7 @@
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear' }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper' }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -135,6 +135,7 @@
   const stage = $('#stage'), track = $('#track'), calEl = $('#cal'), searchEl = $('#search'), nowEl = $('#now'), veil = $('#veil'), dotsEl = $('#dots');
   function paint() {
     const w = W(), h = H();
+    pageTint(hx);
     if (wide()) {
       track.style.transform = ''; calEl.style.transform = ''; calEl.style.visibility = 'visible';
     } else {
@@ -998,7 +999,8 @@
     if (d.color) { setTheme({ color: d.color, auto: false }); return; }
     if (d.pat) { setTheme({ pat: d.pat }); return; }
     if (d.str) { setTheme({ str: d.str }); return; }
-    if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false }); return; }
+    if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
+    if (d.font) { setTheme({ font: d.font }); return; }
     if (d.thact) { themeAct(d.thact); return; }
     if (d.wx) { setTheme({ wx: d.wx }); return; }
     if (d.open !== undefined) { open(d.open, d.label); return; }

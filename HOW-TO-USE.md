@@ -35,6 +35,9 @@ Neither is on any page. Swipe down and type the name.
   - **Sets** are ready-made pairs (Tablet, Blueprint, Arcade, Terrazzo, Night sky, Desert, Memphis, Graph paper, Picnic).
   - **Palettes**, **One color, all the way through** (light and dark of nine hues), **Loud**, and **Gradients**.
   - **Weather** (under Follow the sun), as on jere.ing: Clear, Rain or Storm, falling behind everything over any theme, with lightning in storms. **Real** follows Reston's actual weather (rain, snow, storms) and checks every 30 minutes. The rain pauses whenever Paper isn't on screen.
+  - **SHELL**: SHELL's nine themes (Ember, Mono, Dusk, Moss, Ice, Blood, Gold, Rose, Void): the color at the top falling into black, a grey band at the bottom, grain. The **Scanlines** pattern adds SHELL's CRT lines.
+  - **A color for each page**: Calendar, Home and Folders each get their own color, blending as you swipe (Neapolitan, Fruit, Pastel, Earth, Sea, Loud three, Night three, SHELL three, Candy).
+  - **Fonts**: Paper, SHELL (JetBrains Mono), Serif, Editorial, Grotesk, Rounded, Typewriter, Terminal, System. They download the first time you pick one; without internet the phone's own font stands in.
   - **Patterns** go over any color, Soft or Bold: Tablet, Dots, Graph, Blueprint, Hatch, Ripples, Dunes, Stars, Terrazzo, Maze, Crosses, Confetti, Memphis, Stripes, Gingham.
   - **Surprise me** picks at random; **Back to Paper** undoes everything. Typing a color's name (`lapis`) applies it directly.
 

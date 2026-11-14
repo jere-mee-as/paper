@@ -51,10 +51,10 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .cols{margin-top:30px;padding-right:28px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:14px}
 .col{display:flex;flex-direction:column;min-width:0}
 .col .mono{margin:0 0 6px}
-.app{min-height:54px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:300;font-size:24px;letter-spacing:-.7px}
+.app{min-height:54px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:300;font-size:calc(24px * var(--fs,1));letter-spacing:-.7px}
 .app.missing{color:var(--ink2);text-decoration:line-through;text-decoration-thickness:1px}
 #plainList{margin-top:24px;padding-right:28px;flex:1;min-height:0;padding-bottom:60px}
-#plainList .app{font-size:22px;min-height:50px}
+#plainList .app{font-size:calc(22px * var(--fs,1));min-height:50px}
 .letter{margin:16px 0 2px}
 #rail{position:absolute;right:0;padding-right:6px;touch-action:none;z-index:3;top:calc(var(--top,24px) + 128px);bottom:calc(var(--bot,16px) + 76px);width:40px;
   display:flex;flex-direction:column;justify-content:flex-start;align-items:center}
@@ -64,6 +64,9 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #rail button.off{opacity:.35}
 
 /* page dots */
+#app.shellish #dots{background:rgba(10,10,10,.6)}
+#app.shellish #dots button{color:rgba(245,243,239,.45)}
+#app.shellish #dots button.on{color:#f5f3ef}
 #dots{position:absolute;left:50%;bottom:calc(var(--bot,16px) + 18px);transform:translateX(-50%);z-index:6;display:flex;gap:2px;padding:4px 8px;
   border-radius:999px;background:rgba(var(--inkRGB),.06);touch-action:none}
 #dots button{width:34px;height:30px;display:flex;align-items:center;justify-content:center;color:rgba(var(--inkRGB),.3)}
@@ -91,7 +94,8 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .fname{font-weight:300;font-size:34px;letter-spacing:-1.2px}
 .fbody{min-height:0}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:14px}
-.ficons{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 6px;padding:4px 0 16px}
+/* icons line up with the folder's name on the left and its count on the right */
+.ficons{display:grid;grid-template-columns:repeat(4,60px);justify-content:space-between;gap:16px 0;padding:4px 0 16px}
 .fi{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;text-align:center;transition:transform .22s var(--ease),opacity .22s}
 .fi:active{transform:scale(.9);opacity:.75}
 .fic{position:relative;width:60px;height:60px;border-radius:17px;overflow:hidden;background:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;
@@ -99,7 +103,7 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .fic b{font-weight:400;font-size:24px;color:var(--ink2)}
 .fic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .fic.add{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--ink2)}
-.fil{font-size:12.5px;line-height:1.2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fil{font-size:12.5px;line-height:1.2;width:78px;margin:0 -9px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #liftItem.fi{padding:0;background:none;border-radius:0;flex-direction:column;align-items:center;transform-origin:50% 40%}
 #liftItem.fi .fil{color:var(--ink)}
 .chip{min-height:48px;padding:0 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -271,6 +275,7 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 .sw.on .swp{outline:2.5px solid var(--ink);outline-offset:3px}
 .swn{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .sw.on .swn{color:var(--ink);font-weight:500}
+.fsw{background:var(--soft);font-size:28px;font-weight:400;color:var(--ink)}
 
 /* fun stuff folder + the full-screen toy */
 .ftg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
