@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.1.0';
+  const PAGE_VERSION = '0.2.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -91,93 +91,268 @@
     play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#ECE9E2" aria-hidden="true"><path d="M8 5l12 7-12 7z"/></svg>'
   };
 
-  // ------------------------------------------------------------------ navigation
+  // ------------------------------------------------------------------ navigation + motion
   // page: 0 calendar, 1 home, 2 folders. over: '' | 'search' | 'now'.
+  // Everything follows the finger while it's down, then settles with a spring-like ease.
   let page = 1, over = '';
+  const EASE = 'cubic-bezier(.22,1,.36,1)';
+  const DUR = 440;
   const wide = () => window.innerWidth >= 760;
-  function setPage(p) {
+  const W = () => window.innerWidth, H = () => window.innerHeight;
+  const track = $('#track'), searchEl = $('#search'), nowEl = $('#now'), dim = $('#dim');
+
+  function anim(el, on) { el.style.transition = on ? 'transform ' + DUR + 'ms ' + EASE + ', opacity ' + DUR + 'ms ' + EASE : 'none'; }
+  function placeTrack(dx) {
+    if (wide()) { track.style.transform = ''; return; }
+    track.style.transform = 'translate3d(' + (-page * W() + (dx || 0)) + 'px,0,0)';
+  }
+  // How far an overlay is in: 0 = hidden, 1 = fully open. Home recedes behind it.
+  function placeOver(el, which, t) {
+    t = Math.max(0, Math.min(1, t));
+    const y = which === 'search' ? -(1 - t) * H() : (1 - t) * H();
+    el.style.transform = 'translate3d(0,' + y + 'px,0)';
+    el.style.visibility = t > 0.001 ? 'visible' : 'hidden';
+    backdrop(t);
+  }
+  function backdrop(t) {
+    const s = 1 - 0.05 * t;
+    $('#pHome').style.transform = 'scale(' + s + ')';
+    $('#pHome').style.opacity = String(1 - 0.35 * t);
+    dim.style.opacity = String(0.18 * t);
+  }
+  function setPage(p, quiet) {
+    const changed = p !== page;
     page = Math.max(0, Math.min(2, p));
-    $('#track').style.transform = wide() ? '' : 'translateX(' + (-page * 100 / 3) + '%)';
-    if (page === 0) renderCal();
-    if (page === 2) renderFolders();
+    anim(track, true); placeTrack(0);
+    if (page === 0) { renderCal(); if (changed && !quiet) stagger($('#days')); }
+    if (page === 2) { renderFolders(); if (changed && !quiet) stagger($('#folds')); }
+    if (page === 1 && changed && !quiet) staggerHome();
   }
   function setOver(o) {
-    if (over === o) return;
+    const prev = over;
     over = o;
-    $('#search').classList.toggle('open', o === 'search');
-    $('#now').classList.toggle('open', o === 'now');
-    if (o === 'search') { renderResults(); setTimeout(() => $('#q').focus(), 60); }
-    else { $('#q').blur(); }
-    if (o === 'now') renderNow();
+    [['search', searchEl], ['now', nowEl]].forEach(([w, el]) => {
+      anim(el, true); $('#pHome').style.transition = 'transform ' + DUR + 'ms ' + EASE + ', opacity ' + DUR + 'ms ' + EASE;
+      dim.style.transition = 'opacity ' + DUR + 'ms ' + EASE;
+      if (w === o) placeOver(el, w, 1); else if (w === prev || !o) placeOverHidden(el, w);
+    });
+    if (!o) backdrop(0);
+    if (o === 'search') { if (prev !== 'search') { renderResults(); stagger($('#results')); } setTimeout(() => $('#q').focus(), 120); }
+    else $('#q').blur();
+    if (o === 'now' && prev !== 'now') { renderNow(); stagger($('#nowlist')); stagger($('#dock')); }
+    closeRail();
+  }
+  function placeOverHidden(el, w) {
+    el.style.transform = 'translate3d(0,' + (w === 'search' ? -H() : H()) + 'px,0)';
+    setTimeout(() => { if (over !== w) el.style.visibility = 'hidden'; }, DUR);
   }
   function goHome() { closeSheet(); setOver(''); setPage(1); }
 
+  // Children rise into place one after another.
+  function stagger(box, max) {
+    if (!box) return;
+    const kids = [...box.children].slice(0, max || 14);
+    kids.forEach((c, i) => {
+      c.style.animation = 'none';
+      void c.offsetWidth;
+      c.style.animation = 'rise 520ms ' + EASE + ' ' + (i * 28) + 'ms both';
+    });
+  }
+  function staggerHome() {
+    stagger($('#colPeople')); stagger($('#colThings'));
+    if (!S.jere) stagger($('#plainList'), 12);
+  }
+
   // ------------------------------------------------------------------ gestures
-  let g = null, suppressClick = false;
+  // One gesture model for touch and mouse. Axis is decided after 8 px; a flick (velocity) or
+  // a quarter of the way commits; otherwise it springs back. Lists scroll natively until they
+  // reach their edge, then the same drag moves the panel.
+  let G = null, suppressClick = false;
+  const SLOP = 8;
   function scroller(el) {
     while (el && el !== document.body) { if (el.classList && el.classList.contains('scroll')) return el; el = el.parentElement; }
     return null;
   }
-  document.addEventListener('pointerdown', (e) => {
-    if (sheetOpen) return;
-    g = { x: e.clientX, y: e.clientY, t: Date.now(), sc: scroller(e.target), target: e.target, sy: 0 };
-    if (g.sc) g.sy = g.sc.scrollTop;
-    startHold(e);
-  }, { passive: true });
-  document.addEventListener('pointermove', (e) => {
-    if (!g) return;
-    if (Math.abs(e.clientX - g.x) > 10 || Math.abs(e.clientY - g.y) > 10) cancelHold();
-  }, { passive: true });
-  document.addEventListener('pointercancel', () => { cancelHold(); g = null; });
-  document.addEventListener('pointerup', (e) => {
-    cancelHold();
-    const s = g; g = null;
-    if (!s || sheetOpen) return;
-    const dx = e.clientX - s.x, dy = e.clientY - s.y;
-    const ax = Math.abs(dx), ay = Math.abs(dy);
-    if (Math.max(ax, ay) < 44 || Date.now() - s.t > 900) return;
-    let dir;
-    if (ax > ay * 1.2) dir = dx > 0 ? 'right' : 'left';
-    else if (ay > ax * 1.2) dir = dy > 0 ? 'down' : 'up';
-    else return;
-    // A vertical swipe inside a list that moved (or could still move that way) is a scroll, not navigation.
-    if ((dir === 'up' || dir === 'down') && s.sc) {
-      const sc = s.sc;
-      if (sc.scrollTop !== s.sy) return;
-      if (dir === 'down' && sc.scrollTop > 0) return;
-      if (dir === 'up' && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 2) return;
+  function gStart(x, y, target, ev) {
+    if (target.closest && target.closest('#rail')) { railStart(y, x); G = { rail: true }; return; }
+    if (sheetOpen) {
+      const sb = $('#sbody');
+      if (target.closest('#sheet') && (target.closest('.grab') || sb.scrollTop <= 0) && !target.closest('input')) G = { sheet: true, x, y, t: Date.now(), pts: [[Date.now(), y]] };
+      return;
     }
-    if (swipe(dir, s)) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 350); }
-  });
-  document.addEventListener('click', (e) => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
-
-  function swipe(dir, s) {
-    if (over === 'search') { if (dir === 'up') { setOver(''); return true; } return false; }
-    if (over === 'now') { if (dir === 'down') { setOver(''); return true; } return false; }
-    if (dir === 'down') {
-      if (page !== 1 && !wide()) return false;
-      if (s.y < 70) { call('shade'); return true; }      // from the very top: the phone's own notifications
-      setOver('search'); return true;
-    }
-    if (dir === 'up') { if (page !== 1 && !wide()) return false; setOver('now'); return true; }
-    if (wide()) return false;
-    if (dir === 'right' && page > 0) { setPage(page - 1); return true; }
-    if (dir === 'left' && page < 2) { setPage(page + 1); return true; }
-    return false;
+    if (railPinned && !target.closest('#railPop')) { closeRail(); G = { eat: true }; return; }
+    G = { x, y, t: Date.now(), target, sc: scroller(target), axis: '', mode: '', pts: [[Date.now(), x, y]] };
+    startHold(target);
   }
+  function canScroll(sc, dirDown) {   // dirDown: finger moving down (content would scroll up)
+    if (!sc) return false;
+    return dirDown ? sc.scrollTop > 0 : sc.scrollTop + sc.clientHeight < sc.scrollHeight - 1;
+  }
+  function gMove(x, y, ev) {
+    if (!G) return false;
+    if (G.rail) { railMove(y, x); return true; }
+    if (G.eat) return true;
+    const dx = x - G.x, dy = y - G.y;
+    if (G.sheet) {
+      if (dy > 0) { const sh = $('#sheet'); sh.style.transition = 'none'; sh.style.transform = 'translate3d(0,' + dy + 'px,0)'; G.pts.push([Date.now(), y]); return true; }
+      return false;
+    }
+    G.pts.push([Date.now(), x, y]); if (G.pts.length > 6) G.pts.shift();
+    if (!G.axis) {
+      if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return false;
+      cancelHold();
+      G.axis = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      G.mode = pickMode(dx, dy);
+      if (!G.mode) { G = null; return false; }
+      if (G.mode === 'track') anim(track, false);
+      if (G.mode === 'openSearch' || G.mode === 'closeSearch') { anim(searchEl, false); searchEl.style.visibility = 'visible'; }
+      if (G.mode === 'openNow' || G.mode === 'closeNow') { anim(nowEl, false); nowEl.style.visibility = 'visible'; }
+      $('#pHome').style.transition = 'none'; dim.style.transition = 'none';
+      if (G.mode === 'openSearch' && !S.jere) renderResults();
+    }
+    switch (G.mode) {
+      case 'track': {
+        let d = dx;
+        if ((page === 0 && d > 0) || (page === 2 && d < 0)) d = d * 0.32;   // rubber band at the ends
+        placeTrack(d); break;
+      }
+      case 'openSearch': placeOver(searchEl, 'search', Math.max(0, dy) / (H() * 0.62)); break;
+      case 'closeSearch': placeOver(searchEl, 'search', 1 + Math.min(0, dy) / H()); break;
+      case 'openNow': placeOver(nowEl, 'now', Math.max(0, -dy) / (H() * 0.62)); break;
+      case 'closeNow': placeOver(nowEl, 'now', 1 - Math.max(0, dy) / H()); break;
+      case 'shade': break;
+    }
+    return true;
+  }
+  function pickMode(dx, dy) {
+    const down = dy > 0;
+    if (G.axis === 'h') {
+      if (over || wide()) return '';
+      return 'track';
+    }
+    if (over === 'search') return !down && !canScroll(G.sc, false) ? 'closeSearch' : '';
+    if (over === 'now') return down && !canScroll(G.sc, true) ? 'closeNow' : '';
+    if (page !== 1 && !wide()) return '';
+    if (canScroll(G.sc, down)) return '';
+    if (down && G.y < 56) return 'shade';
+    return down ? 'openSearch' : 'openNow';
+  }
+  function velocity(s) {
+    const p = s.pts; if (p.length < 2) return [0, 0];
+    const a = p[0], b = p[p.length - 1], dt = Math.max(1, b[0] - a[0]);
+    return [(b[1] - a[1]) / dt, (b[2] - a[2]) / dt];
+  }
+  function gEnd(x, y, target) {
+    cancelHold();
+    const s = G; G = null;
+    if (!s) return;
+    if (s.rail) { railEnd(x, y); suppress(); return; }
+    if (s.eat) { suppress(); return; }
+    if (s.sheet) {
+      const dy = y - s.y, sh = $('#sheet');
+      const v = s.pts.length > 1 ? (s.pts[s.pts.length - 1][1] - s.pts[0][1]) / Math.max(1, s.pts[s.pts.length - 1][0] - s.pts[0][0]) : 0;
+      sh.style.transition = ''; sh.style.transform = '';
+      if (dy > 110 || v > 0.6) closeSheet();
+      return;
+    }
+    if (!s.mode) return;
+    suppress();
+    const dx = x - s.x, dy = y - s.y;
+    const [vx, vy] = velocity(s);
+    const FLICK = 0.42;
+    switch (s.mode) {
+      case 'track': {
+        let p = page;
+        if ((dx < -W() * 0.22 || vx < -FLICK) && page < 2) p = page + 1;
+        else if ((dx > W() * 0.22 || vx > FLICK) && page > 0) p = page - 1;
+        if (p !== page) haptic('tick');
+        setPage(p);
+        break;
+      }
+      case 'openSearch': setOver(dy > H() * 0.16 || vy > FLICK ? 'search' : ''); break;
+      case 'openNow': setOver(-dy > H() * 0.16 || vy < -FLICK ? 'now' : ''); break;
+      case 'closeSearch': setOver(-dy > H() * 0.14 || vy < -FLICK ? '' : 'search'); break;
+      case 'closeNow': setOver(dy > H() * 0.14 || vy > FLICK ? '' : 'now'); break;
+      case 'shade': if (dy > 30) call('shade'); break;
+    }
+  }
+  function suppress() { suppressClick = true; setTimeout(() => { suppressClick = false; }, 320); }
+
+  // Touch: non-passive so a drag we own doesn't also scroll the page.
+  document.addEventListener('touchstart', (e) => { const t = e.touches[0]; if (e.touches.length > 1) { G = null; return; } gStart(t.clientX, t.clientY, e.target, e); }, { passive: true });
+  document.addEventListener('touchmove', (e) => { const t = e.touches[0]; if (gMove(t.clientX, t.clientY, e) && e.cancelable) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchend', (e) => { const t = e.changedTouches[0]; gEnd(t.clientX, t.clientY, e.target); });
+  document.addEventListener('touchcancel', () => { cancelHold(); if (G && G.mode) { G = null; setPage(page); setOver(over); } G = null; });
+  // Mouse (desktop preview).
+  let mouseDown = false;
+  document.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') return; mouseDown = true; gStart(e.clientX, e.clientY, e.target, e); });
+  document.addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse' || !mouseDown) return; gMove(e.clientX, e.clientY, e); });
+  document.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') return; mouseDown = false; gEnd(e.clientX, e.clientY, e.target); });
+  document.addEventListener('click', (e) => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
 
   // Hold (long-press) on anything with data-hold.
   let holdT = 0;
-  function startHold(e) {
-    const el = e.target.closest && e.target.closest('[data-hold]');
-    if (!el) return;
+  function startHold(target) {
+    const el = target.closest && target.closest('[data-hold]');
+    if (!el || !el.dataset.hold) return;
+    el.classList.add('pressing');
     holdT = setTimeout(() => {
-      holdT = 0; g = null; suppressClick = true; setTimeout(() => { suppressClick = false; }, 400);
+      holdT = 0; el.classList.remove('pressing');
+      if (G) G.mode = ''; G = null; suppress();
       haptic('long');
       onHold(el);
-    }, 480);
+    }, 460);
+    startHold.el = el;
   }
-  function cancelHold() { if (holdT) { clearTimeout(holdT); holdT = 0; } }
+  function cancelHold() {
+    if (holdT) { clearTimeout(holdT); holdT = 0; }
+    if (startHold.el) { startHold.el.classList.remove('pressing'); startHold.el = null; }
+  }
+
+  // ------------------------------------------------------------------ A–Z rail
+  // Touch the rail and slide: a card beside your finger shows that letter's apps.
+  // Slide left onto an app and let go to open it, or let go on the rail and the card stays: tap one.
+  let railLetter = '', railPinned = false;
+  const railPop = $('#railPop');
+  function railLetterAt(y) {
+    const r = $('#rail').getBoundingClientRect();
+    const i = Math.max(0, Math.min(25, Math.floor((y - r.top) / (r.height / 26))));
+    return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[i];
+  }
+  function railStart(y, x) { railPinned = false; railShow(railLetterAt(y), y); }
+  function railMove(y, x) {
+    const r = $('#rail').getBoundingClientRect();
+    if (x < r.left - 14) return;          // finger moved onto the card: keep the letter
+    railShow(railLetterAt(y), y);
+  }
+  function railShow(L, y) {
+    if (L !== railLetter) {
+      railLetter = L; haptic('tick');
+      document.querySelectorAll('#rail button').forEach((b) => b.classList.toggle('on', b.dataset.letter === L));
+      if (!S.jere) {
+        const h = document.getElementById('L-' + L);
+        if (h) $('#plainList').scrollTo({ top: h.offsetTop - $('#plainList').offsetTop, behavior: 'smooth' });
+      }
+      const apps = APPS.filter((a) => initial(a.label) === L);
+      railPop.innerHTML = '<p class="rl">' + L + '</p>' + (apps.length ? '<div class="rlist scroll">' + apps.map((a) =>
+        '<button class="ra" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '">' + esc(a.label) + '</button>').join('') + '</div>' : '<p class="rnone">No apps</p>');
+    }
+    const top = Math.max(16, Math.min(H() - 330, y - 50));
+    railPop.style.top = top + 'px';
+    railPop.classList.add('on');
+  }
+  function railEnd(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const hit = el && el.closest && el.closest('#railPop [data-open]');
+    if (hit) { const k = hit.dataset.open, l = hit.dataset.label; closeRail(); open(k, l); return; }
+    const has = railPop.querySelector('[data-open]');
+    if (has && S.jere) { railPinned = true; } else closeRail();
+  }
+  function closeRail() {
+    railPinned = false; railLetter = '';
+    railPop.classList.remove('on');
+    document.querySelectorAll('#rail button.on').forEach((b) => b.classList.remove('on'));
+  }
 
   // ------------------------------------------------------------------ home
   function renderClock() {
@@ -261,12 +436,25 @@
     $('#folds').innerHTML = list.map((f, i) => {
       const isOpen = S.open === f.name;
       const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
-      return '<div class="fold"><button class="fold-h" data-fold="' + esc(f.name) + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '" aria-expanded="' + isOpen + '">' +
-        '<span class="nm">' + esc(f.name) + '</span><span class="sg" aria-hidden="true">' + (isOpen ? '−' : '+') + '</span></button>' +
-        (isOpen ? '<div class="chips">' + apps.map((a) => '<button class="chip" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + esc(a.label) + '</button>').join('') +
-          (f.auto ? '' : '<button class="chip ghost" data-addto="' + i + '">' + (apps.length ? '+ Add' : '+ Add apps') + '</button>') + '</div>' : '') +
+      return '<div class="fold' + (isOpen ? ' open' : '') + '" data-name="' + esc(f.name) + '"><button class="fold-h" data-fold="' + esc(f.name) + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '" aria-expanded="' + isOpen + '">' +
+        '<span class="nm">' + esc(f.name) + '</span><span class="sg" aria-hidden="true"></span></button>' +
+        '<div class="fold-b"><div class="fold-in"><div class="chips">' + apps.map((a) => '<button class="chip" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + esc(a.label) + '</button>').join('') +
+          (f.auto ? '' : '<button class="chip ghost" data-addto="' + i + '">' + (apps.length ? '+ Add' : '+ Add apps') + '</button>') + '</div></div></div>' +
         '</div>';
     }).join('');
+  }
+  // Opens one folder and closes the others, animating both.
+  function toggleFolder(name) {
+    S.open = S.open === name ? '' : name; save();
+    document.querySelectorAll('#folds .fold').forEach((el) => {
+      const on = el.dataset.name === S.open;
+      if (on !== el.classList.contains('open')) {
+        el.classList.toggle('open', on);
+        el.querySelector('.fold-h').setAttribute('aria-expanded', String(on));
+        if (on) stagger(el.querySelector('.chips'));
+      }
+    });
+    haptic('tick');
   }
 
   // ------------------------------------------------------------------ search
@@ -357,13 +545,26 @@
       if (!msgs.length && !(MEDIA && MEDIA.title) && !ev) parts.push('<section class="sec"><span class="tx">Nothing waiting. Nothing playing.</span></section>');
     }
     $('#nowlist').innerHTML = parts.join('');
-    $('#toggles').innerHTML =
-      '<button class="btn' + (S.dnd ? ' on' : '') + '" data-tog="dnd">Silent</button>' +
-      '<button class="btn' + (S.torch ? ' on' : '') + '" data-tog="torch">Torch</button>' +
-      '<button class="btn" data-tog="timer">Timer</button>' +
-      '<button class="btn" data-tog="camera">Camera</button>';
+    $('#dock').innerHTML = DOCK.map(([k, label, icon]) =>
+      '<button class="dk" data-dock="' + k + '"' + (k === 'settings' ? ' data-hold="paper-settings"' : '') + '><span class="di">' + icon + '</span><span class="dl">' + label + '</span></button>').join('');
     if (replyOpen) { const i = $('.reply input'); if (i) setTimeout(() => i.focus(), 30); }
   }
+  const DI = (d) => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  const DOCK = [
+    ['camera', 'Camera', DI('M4 8h3l2-3h6l2 3h3v11H4z M8.5 13a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0')],
+    ['gallery', 'Gallery', DI('M4 5h16v14H4z M4 16l5-5 4 4 3-3 4 4 M15 9.5a1 1 0 1 0 0.01 0')],
+    ['clock', 'Clock', DI('M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0 M12 8v4l3 2')],
+    ['settings', 'Settings', DI('M4 8h10 M18 8h2 M4 16h2 M10 16h10 M14 8a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M6 16a2 2 0 1 0 4 0a2 2 0 1 0-4 0')],
+    ['contacts', 'Contacts', DI('M12 12a3.5 3.5 0 1 0 0-7a3.5 3.5 0 1 0 0 7 M5 20c1-3.6 3.8-5.5 7-5.5s6 1.9 7 5.5')]
+  ];
+  function dock(k) {
+    if (k === 'camera') { if (!call('camera')) openFirst(['Camera']); return; }
+    if (k === 'gallery') return openFirst(['Gallery', 'Google Photos', 'Photos']);
+    if (k === 'clock') return openFirst(['Clock']);
+    if (k === 'contacts') return openFirst(['Contacts', 'Phone']);
+    if (k === 'settings') { const a = findApp(['Settings']); if (a) open(a.key, a.label); else call('settings', ''); }
+  }
+  function openFirst(names) { const a = findApp(names); if (a) open(a.key, a.label); else toast(names[0] + ' isn’t installed'); }
   function agoText(t) {
     const m = Math.round((Date.now() - t) / 6e4);
     if (m < 1) return 'now'; if (m < 60) return m + ' min'; const h = Math.round(m / 60); if (h < 24) return h + ' h'; return Math.round(h / 24) + ' d';
@@ -375,6 +576,7 @@
     $('#sbody').innerHTML = html;
     $('#sbody').scrollTop = 0;
     $('#sheet').classList.add('on'); $('#scrim').classList.add('on');
+    closeRail();
     sheetOpen = true;
   }
   function closeSheet() {
@@ -387,7 +589,7 @@
 
   function onHold(el) {
     const h = el.dataset.hold || '';
-    if (h === 'clock') return openSettings();
+    if (h === 'clock' || h === 'paper-settings') return openSettings();
     if (h.startsWith('folder:')) return folderSheet(+h.split(':')[1]);
     const key = el.dataset.key, label = el.dataset.label;
     appSheet(key, label, h);
@@ -493,8 +695,7 @@
     if (!t) { if (e.target === $('#scrim')) closeSheet(); return; }
     const d = t.dataset;
     if (d.open !== undefined) { open(d.open, d.label); return; }
-    if (d.letter) { letter = d.letter; $('#q').value = d.letter; setOver('search'); renderResults(); return; }
-    if (d.fold) { S.open = S.open === d.fold ? '' : d.fold; save(); renderFolders(); return; }
+    if (d.fold) { toggleFolder(d.fold); return; }
     if (d.addto !== undefined) { openPicker({ fold: +d.addto }); return; }
     if (d.ev) { call('openEvent', d.ev); return; }
     if (d.res !== undefined) { runResult(+d.res); return; }
@@ -505,7 +706,7 @@
     if (d.reply) { replyOpen = d.reply; renderNow(); return; }
     if (d.clear) { call('notifDismiss', d.clear); setTimeout(renderNow, 200); return; }
     if (d.mode !== undefined) { setMode(d.mode === '1'); return; }
-    if (d.tog) return toggle(d.tog);
+    if (d.dock) return dock(d.dock);
     if (d.pk) return pick(d.pk);
     if (d.tofold !== undefined) {
       const f = S.folders[+d.tofold], k = d.k;
@@ -527,17 +728,6 @@
       replyOpen = ''; setTimeout(renderNow, 300);
     }
   });
-  function toggle(k) {
-    if (k === 'dnd') { const ok = call('setDnd', !S.dnd); if (ok) { S.dnd = !S.dnd; save(); } else call('askPerm', 'dnd'); }
-    if (k === 'torch') { const ok = call('torch', !S.torch); if (ok) { S.torch = !S.torch; save(); } }
-    if (k === 'timer') {
-      sheetKind = 'timer';
-      openSheet('<h2>Timer</h2><div class="toggles" style="grid-template-columns:repeat(3,1fr)">' + [1, 3, 5, 10, 15, 25, 30, 45, 60].map((m) => '<button class="btn" data-act="timer" data-m="' + m + '">' + m + ' min</button>').join('') + '</div>');
-      return;
-    }
-    if (k === 'camera') { call('camera'); return; }
-    renderNow();
-  }
   function pick(key) {
     if (!picker) return;
     if (picker.fold != null) {
@@ -589,8 +779,8 @@
     onNative(type, data) {
       const v = J(data, data);
       switch (type) {
-        case 'back': if (sheetOpen) closeSheet(); else if (over) setOver(''); else setPage(1); break;
-        case 'home': goHome(); break;
+        case 'back': if (railPinned) closeRail(); else if (sheetOpen) closeSheet(); else if (over) setOver(''); else setPage(1); break;
+        case 'home': closeRail(); if (page === 1 && !over && !sheetOpen) staggerHome(); goHome(); break;
         case 'apps': loadApps(); renderHome(); renderFolders(); break;
         case 'resume': renderClock(); loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
         case 'perms': loadEvents(); renderCal(); if (over === 'now') renderNow(); if (sheetKind === 'settings') openSettings(); break;
@@ -605,8 +795,11 @@
   if (N.__mock) document.documentElement.style.setProperty('--top', '24px');
   else { document.documentElement.style.setProperty('--top', '0px'); document.documentElement.style.setProperty('--bot', '0px'); }
   loadApps(); loadEvents();
-  renderHome(); renderCal(); renderFolders(); setPage(1);
+  renderHome(); renderCal(); renderFolders();
+  anim(track, false); placeTrack(0);
+  anim(searchEl, false); anim(nowEl, false); placeOverHidden(searchEl, 'search'); placeOverHidden(nowEl, 'now');
+  requestAnimationFrame(() => staggerHome());
   setInterval(renderClock, 10000);
-  window.addEventListener('resize', () => setPage(page));
+  window.addEventListener('resize', () => { anim(track, false); placeTrack(0); if (over) placeOver(over === 'search' ? searchEl : nowEl, over, 1); else { placeOverHidden(searchEl, 'search'); placeOverHidden(nowEl, 'now'); } });
   call('ready');
 })();

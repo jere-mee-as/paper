@@ -18,9 +18,9 @@
 | Swipe down | Search |
 | Swipe down from the very top edge | The phone's own notifications |
 | Swipe up | Now |
-| Tap a letter on the right edge | Every app starting with it |
+| Slide along the letters on the right edge | A card of that letter's apps follows your finger. Slide onto an app and let go to open it, or let go on the rail and tap one |
 | Hold an app | Open, remove from Home, put in folders, app info, uninstall |
-| Hold the clock | Settings |
+| Hold the clock, or hold Settings on Now | Paper's settings |
 
 Back always returns home. Unfolded, Calendar, Home and Folders show side by side.
 

@@ -10,11 +10,12 @@ Calendar  ←      Home      →  Folders
                Now (swipe up)
 ```
 
-- **Home**: your apps in two columns, People and Things, plus an A–Z rail on the right edge.
+- **Home**: your apps in two columns, People and Things, plus an A–Z rail on the right edge you can slide along.
 - **Calendar**: the next 7 days as one list, read from the phone's calendar (Google Calendar).
 - **Folders**: Finance, Dating, Social, AI, Audio, Media, Work, Proton. Tap to open, hold to rename.
 - **Search**: apps, folders and commands. Type `jere mode`, `plain mode`, `settings` or `update`.
-- **Now**: what's next, what's playing, who's waiting on a reply, plus Silent, Torch, Timer and Camera.
+- **Now**: what's next, what's playing, who's waiting on a reply, plus Camera, Gallery, Clock, Settings and Contacts.
+- Everything follows your finger: half a swipe and let go springs back, a quick flick is enough to switch.
 - **Jere mode** is the curated setup. **Plain mode** is every app A–Z with folders by type.
 - Unfolded on the Fold, Calendar, Home and Folders sit side by side.
 
