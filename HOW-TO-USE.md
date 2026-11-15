@@ -38,6 +38,8 @@ Neither is on any page. Swipe down and type the name.
   - **SHELL**: SHELL's nine themes (Ember, Mono, Dusk, Moss, Ice, Blood, Gold, Rose, Void): the color at the top falling into black, a grey band at the bottom, grain. The **Scanlines** pattern adds SHELL's CRT lines.
   - **A color for each page**: Calendar, Home and Folders each get their own color, blending as you swipe (Neapolitan, Fruit, Pastel, Earth, Sea, Loud three, Night three, SHELL three, Candy).
   - **Fonts**: Paper, SHELL (JetBrains Mono), Serif, Editorial, Grotesk, Rounded, Typewriter, Terminal, System. They download the first time you pick one; without internet the phone's own font stands in.
+  - **Layout**: Paper (default) or **SHELL**: everything in JetBrains Mono, a ledger of today on the left (date, today's events, waiting messages, the weather when Real weather is on) and the time stacked thin on the right. Works with any color.
+  - **Icons**: small icons beside app names on Home (Off, App colors, or Tinted to the theme), and beside folder names (Off, Filled, or Line). Hold a folder → **Icon** to give it its own icon and color.
   - **Patterns** go over any color, Soft or Bold: Tablet, Dots, Graph, Blueprint, Hatch, Ripples, Dunes, Stars, Terrazzo, Maze, Crosses, Confetti, Memphis, Stripes, Gingham.
   - **Surprise me** picks at random; **Back to Paper** undoes everything. Typing a color's name (`lapis`) applies it directly.
 

@@ -4,6 +4,7 @@
     <div id="track">
       <section class="page" id="pHome" aria-label="Home">
         <div class="clockrow">
+          <div class="mono" id="lhead"></div>
           <p id="clock" role="button" aria-label="Time. Hold for settings"></p>
           <p class="mono" id="date" style="margin:0"></p>
         </div>
@@ -54,6 +55,7 @@
 
   <div id="scrim"></div>
   <div id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="sbody" id="sbody"></div></div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="duo" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR id="duoR" type="table" tableValues="0 0 .5 1"/><feFuncG id="duoG" type="table" tableValues="0 0 .5 1"/><feFuncB id="duoB" type="table" tableValues="0 0 .5 1"/></feComponentTransfer></filter></svg>
   <div id="toy" role="dialog" aria-modal="true"><div class="toyhead"><span class="mono" id="toyName"></span><button id="toyX" aria-label="Close">×</button></div><div id="toyBody"></div></div>
   <div id="toast" role="status"></div>
 </div>

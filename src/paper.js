@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.7.0';
+  const PAGE_VERSION = '0.8.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -33,7 +33,7 @@
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper' }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off' }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -441,7 +441,7 @@
       it.className = 'fi lifted'; it.innerHTML = el.innerHTML;
       it.style.left = r.left + 'px'; it.style.top = r.top + 'px'; it.style.width = r.width + 'px';
     } else {
-      it.textContent = el.textContent.trim();
+      it.textContent = (el.dataset.label || el.textContent).trim();
       it.style.font = getComputedStyle(el).font;
       it.style.letterSpacing = getComputedStyle(el).letterSpacing;
       it.style.left = (r.left - 14) + 'px'; it.style.top = (r.top - 6) + 'px'; it.style.minHeight = (r.height + 12) + 'px';
@@ -515,16 +515,23 @@
   // ------------------------------------------------------------------ home
   function renderClock() {
     const d = new Date();
-    $('#clock').textContent = hm(d);
+    if (S.theme.layout === 'shell') {
+      // SHELL layout: hours over minutes, and a mono ledger block on the left
+      const t = hm(d), k = t.indexOf(':');
+      $('#clock').innerHTML = esc(t.slice(0, k)) + '<br>' + esc(t.slice(k));
+      $('#lhead').innerHTML = ledgerHead(d);
+    } else $('#clock').textContent = hm(d);
+    $('#clock').setAttribute('aria-label', hm(d) + '. Hold for settings');
     $('#date').textContent = DN[d.getDay()] + ' ' + d.getDate() + ' ' + MN[d.getMonth()];
   }
   function appBtn(h, where) {
     const ok = h.key && byKey.has(h.key);
-    return '<button class="app' + (ok ? '' : ' missing') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '">' + esc(h.name) + '</button>';
+    return '<button class="app' + (ok ? '' : ' missing') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '">' + homeIcon(h.key) + '<span class="an">' + esc(h.name) + '</span></button>';
   }
   function renderHome() {
     renderClock();
     const jere = S.jere;
+    $('#app').classList.toggle('withicons', S.theme.icons === 'color' || S.theme.icons === 'tint');
     $('#cols').hidden = !jere;
     $('#plainList').hidden = jere;
     if (jere) {
@@ -536,7 +543,7 @@
         const L = initial(a.label);
         const head = L !== last ? '<p class="mono letter" id="L-' + L + '">' + L + '</p>' : '';
         last = L;
-        return head + '<button class="app" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="app" data-key="' + esc(a.key) + '">' + esc(a.label) + '</button>';
+        return head + '<button class="app" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="app" data-key="' + esc(a.key) + '">' + homeIcon(a.key) + '<span class="an">' + esc(a.label) + '</span></button>';
       }).join('');
     }
     const have = new Set(APPS.map((a) => initial(a.label)));
@@ -613,7 +620,7 @@
       return '<button class="tile" data-tile="' + i + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '">' +
         '<span class="tapps">' + (apps.length ? apps.slice(0, 3).map((a) => '<span>' + esc(shortName(a.label)) + '</span>').join('') : '<span class="tempty">Empty</span>') +
         (more > 0 ? '<span class="mono">+' + more + ' more</span>' : '') + '</span>' +
-        '<span class="tname">' + esc(f.name) + '</span></button>';
+        '<span class="tname">' + folderIcon(f, 22) + '<span>' + esc(f.name) + '</span></span></button>';
     }).join('');
   }
 
@@ -625,7 +632,7 @@
     const tile = document.querySelector('[data-tile="' + i + '"]');
     const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
     const v = $('#fview');
-    v.innerHTML = '<div class="fhead"><span class="fname"' + (f.auto ? '' : ' data-hold="foldtitle:' + i + '"') + '>' + esc(f.name) + '</span><span class="mono">' + apps.length + (apps.length === 1 ? ' app' : ' apps') + '</span></div>' +
+    v.innerHTML = '<div class="fhead"><span class="fname"' + (f.auto ? '' : ' data-hold="foldtitle:' + i + '"') + '>' + folderIcon(f, 28) + '<span>' + esc(f.name) + '</span></span><span class="mono">' + apps.length + (apps.length === 1 ? ' app' : ' apps') + '</span></div>' +
       '<div class="fbody scroll"><div class="ficons">' + apps.map((a) => '<button class="fi" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + appIcon(a) + '<span class="fil">' + esc(shortName(a.label)) + '</span></button>').join('') +
       '</div>' + (!apps.length && !f.auto ? '<p class="hint" style="margin:0 0 14px">Empty. Hold the name to add apps.</p>' : '') + '</div>';
     folderOpen = i;
@@ -868,6 +875,7 @@
       return lift(el, [
         { id: 'a', label: 'Add apps', run: () => { closeFolder(true); openPicker({ fold: i }); } },
         { id: 'r', label: 'Rename', run: () => { closeFolder(true); folderSheet(i); } },
+        { id: 'i', label: 'Icon', run: () => { closeFolder(true); openFolderIcon(i); } },
         { id: 'd', label: 'Delete folder', red: true, run: () => { closeFolder(true); S.folders.splice(i, 1); save(); renderFolders(); toast('Folder deleted'); } }
       ]);
     }
@@ -877,6 +885,7 @@
         { id: 'o', label: 'Open', run: () => openFolder(i) },
         { id: 'a', label: 'Add apps', run: () => openPicker({ fold: i }) },
         { id: 'r', label: 'Rename', run: () => folderSheet(i) },
+        { id: 'i', label: 'Icon', run: () => openFolderIcon(i) },
         { id: 'd', label: 'Delete folder', red: true, run: () => { S.folders.splice(i, 1); save(); renderFolders(); toast('Folder deleted'); } }
       ]);
     }
@@ -1001,6 +1010,12 @@
     if (d.str) { setTheme({ str: d.str }); return; }
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
     if (d.font) { setTheme({ font: d.font }); return; }
+    if (d.layout) { setTheme({ layout: d.layout }); renderHome(); return; }
+    if (d.icons) { setTheme({ icons: d.icons }); renderHome(); return; }
+    if (d.ficons) { setTheme({ ficons: d.ficons }); renderFolders(); return; }
+    if (d.fis) { S.theme.ficons = d.fis; save(); renderFolders(); markFolderIcon(); haptic('tick'); return; }
+    if (d.fic) { const c = FPAL.find((x) => x[0] === d.fic); setFolderIcon({ c: c ? c[1] : '' }); return; }
+    if (d.fig) { setFolderIcon({ g: d.fig }); return; }
     if (d.thact) { themeAct(d.thact); return; }
     if (d.wx) { setTheme({ wx: d.wx }); return; }
     if (d.open !== undefined) { open(d.open, d.label); return; }
@@ -1090,6 +1105,7 @@
 
 /*__THEMES__*/
 /*__FUN__*/
+/*__LOOKS__*/
   // ------------------------------------------------------------------ native events
   window.PAPER = {
     onNative(type, data) {
