@@ -412,6 +412,13 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #app.gridview .ficons .fic{width:78px;height:78px;border-radius:22px}
 #app.gridview .ficons .fic b{font-size:30px}
 #app.gridview .ficons .fil{width:96px;margin:0 -9px}
+
+/* grid with names (0.9.1): a normal icon grid, each app named underneath */
+#app.gnames .gi .fil{display:block;font-size:12px;width:80px;margin:0 -8px}
+#app.gnames #colPeople,#app.gnames #colThings{row-gap:16px}
+#app.gnames .gi{gap:6px}
+#app.gnames.ledger .gi .fil{font-family:var(--mono);font-size:10.5px}
+#app.gnames #liftItem.fi .fil{background:none;color:var(--ink);padding:0;font-size:12px}
 </style>
 </head>
 <body>
@@ -567,7 +574,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.9.0';
+  const PAGE_VERSION = '0.9.1';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -592,7 +599,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid' }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid', gnames: false }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -1007,7 +1014,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     }
     const menu = $('#liftMenu');
     menu.innerHTML = items.map((m) => '<button role="menuitem" class="mi' + (m.red ? ' red' : '') + '" data-lift="' + m.id + '"><span>' + esc(m.label) + '</span>' + (m.note ? '<span class="mn">' + esc(m.note) + '</span>' : '') + '</button>').join('');
-    const nameGap = el.classList.contains('gi') ? 34 : 0;   // a grid icon's name shows under it once lifted
+    const nameGap = el.classList.contains('gi') && !S.theme.gnames ? 34 : 0;   // a grid icon's name shows under it once lifted
     const below = r.bottom + nameGap + 12 + items.length * 50 < H() - 20;
     menu.style.left = Math.max(14, Math.min(W() - 264, r.left - 14)) + 'px';
     if (below) { menu.style.top = (r.bottom + nameGap + 14) + 'px'; menu.style.transformOrigin = '20% 0'; }
@@ -1098,6 +1105,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     const jere = S.jere;
     $('#app').classList.toggle('withicons', S.theme.view !== 'grid' && (S.theme.icons === 'color' || S.theme.icons === 'tint'));
     $('#app').classList.toggle('gridview', S.theme.view === 'grid');
+    $('#app').classList.toggle('gnames', S.theme.view === 'grid' && !!S.theme.gnames);
     $('#cols').hidden = !jere;
     $('#plainList').hidden = jere;
     if (jere) {
@@ -1257,6 +1265,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
     ['Edit home apps', 'Paper', () => openHomeEditor()],
     ['Icon view', 'Look', () => setTheme({ view: 'grid' })],
     ['Name view', 'Look', () => setTheme({ view: 'list' })],
+    ['Show names', 'Look', () => setTheme({ view: 'grid', gnames: true })],
+    ['Hide names', 'Look', () => setTheme({ view: 'grid', gnames: false })],
     ['Fun stuff', 'Hidden', () => openFun()],
     ['Themes', 'Hidden', () => openThemes()],
     ['Phone notifications', 'Phone', () => call('shade')],
@@ -1593,6 +1603,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
     if (d.font) { setTheme({ font: d.font }); return; }
     if (d.view) { setTheme({ view: d.view }); return; }
+    if (d.gnames) { setTheme({ view: 'grid', gnames: d.gnames === 'on' }); return; }
     if (d.layout) { setTheme({ layout: d.layout }); renderHome(); return; }
     if (d.icons) { setTheme({ icons: d.icons }); renderHome(); return; }
     if (d.ficons) { setTheme({ ficons: d.ficons }); renderFolders(); return; }
@@ -2031,7 +2042,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     st.setProperty('--fs', String(FS[f[0]] || 1));
     document.documentElement.dataset.font = f[0];
   }
-  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('view' in patch || 'layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
+  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('view' in patch || 'gnames' in patch || 'layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
   function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
@@ -2044,6 +2055,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
       '<div class="grp"><p class="mono">View</p><div class="seg"><button class="btn sm" data-view="grid">Icons</button><button class="btn sm" data-view="list">Names</button></div>' +
+        '<p class="hint" style="margin:14px 0 8px">Names under the icons</p><div class="seg"><button class="btn sm" data-gnames="on">On</button><button class="btn sm" data-gnames="off">Off</button></div>' +
         '<p class="hint" style="margin:8px 0 0">Icons: Home is a grid of icons (hold one for its name), folder tiles preview what\'s inside, an open folder shows big icons. Names: the lists.</p></div>' +
       '<div class="grp"><p class="mono">Layout</p><div class="seg"><button class="btn sm" data-layout="paper">Paper</button><button class="btn sm" data-layout="shell">SHELL</button></div>' +
         '<p class="hint" style="margin:8px 0 0">SHELL: everything in JetBrains Mono, a ledger of today on the left, the time stacked thin on the right. Works with any color.</p></div>' +
@@ -2068,6 +2080,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     document.querySelectorAll('#sbody [data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === c.id));
     document.querySelectorAll('#sbody [data-str]').forEach((b) => b.classList.toggle('on', b.dataset.str === S.theme.str));
     [['view', 'grid'], ['layout', 'paper'], ['icons', 'off'], ['ficons', 'off']].forEach(([k, d]) => document.querySelectorAll('#sbody [data-' + k + ']').forEach((b) => b.classList.toggle('on', b.dataset[k] === (S.theme[k] || d))));
+    document.querySelectorAll('#sbody [data-gnames]').forEach((b) => b.classList.toggle('on', S.theme.view === 'grid' && (b.dataset.gnames === 'on') === !!S.theme.gnames));
     document.querySelectorAll('#sbody [data-font]').forEach((b) => b.classList.toggle('on', b.dataset.font === (S.theme.font || 'paper')));
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');
     $('#patGrid').querySelectorAll('.swp').forEach((el, i) => { const id = PATS[i][0], t = patCache[id] || (PATS[i][2] && (patCache[id] = PATS[i][2]())); el.style.backgroundColor = c.bg; el.style.backgroundImage = patURL(id, c.ink, c.acc, 0.6) || 'none'; if (t && t.w > 110) el.style.backgroundSize = Math.round(t.w * 0.5) + 'px'; });

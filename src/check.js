@@ -299,10 +299,17 @@ const path = require('path');
   const tb = await (await p.$('[data-tile="0"]')).boundingBox(); await touch('touchStart', tb.x + 40, tb.y + 40); await wait(620); await touch('touchEnd'); await wait(450);
   const tl = await p.evaluate(() => document.querySelector('#liftItem').textContent.trim()); expect(tl.length > 0 && !/\d/.test(tl), 'a held tile lifts as its name (' + tl + ')');
   await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  // names toggle (0.9.1)
+  await p.evaluate(() => PAPER.setTheme({ gnames: true })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(300); await shot('58-grid-names');
+  const gn = await p.evaluate(() => { const g = [...document.querySelectorAll('#cols .gi')]; return { named: g.filter((x) => x.querySelector('.fil').offsetWidth > 0).length, rail: !!document.querySelector('#rail button'), right: Math.max(...g.map((x) => x.getBoundingClientRect().right)), railL: document.querySelector('#rail').getBoundingClientRect().left, bottom: Math.max(...g.map((x) => x.getBoundingClientRect().bottom)) }; });
+  expect(gn.named === 14 && gn.rail && gn.right <= gn.railL + 4 && gn.bottom < 760, 'names under every icon, rail kept, fits ' + JSON.stringify(gn));
+  await find('hide nam'); await tapEl('#results .row'); await settle(); await wait(200);
+  expect((await st()).theme.gnames === false, 'search "hide names" turns them off');
+  await p.evaluate(() => PAPER.setTheme({ gnames: true })); await p.evaluate(() => PAPER.onNative('home', null)); await settle();
   await p.evaluate(() => PAPER.setTheme({ color: 's-ember', layout: 'shell', icons: 'tint', ficons: 'filled' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(500); await shot('56-grid-shell-tint');
   expect((await p.$$('#cols .gi.tint')).length === 14, 'Tinted recolors the grid');
-  await swipe(330, 450, 60, 450); await wait(300); await shot('57-grid-shell-folders');
-  await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', icons: 'off', ficons: 'off' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle();
+  await swipe(60, 450, 330, 450); await settle(); await shot('57b-grid-shell-names'); await swipe(330, 450, 60, 450); await swipe(330, 450, 60, 450); await wait(300); await shot('57-grid-shell-folders');
+  await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', icons: 'off', ficons: 'off', gnames: false })); await p.evaluate(() => PAPER.onNative('home', null)); await settle();
   // weather
   await p.evaluate(() => PAPER.setTheme({ color: 'sun-night', pat: 'none', wx: 'rain' })); await wait(700);
   let wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'rain' && wx.running && wx.drops > 20, 'rain falls ' + JSON.stringify(wx)); await shot('25-weather-rain-night');

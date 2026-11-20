@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.9.0';
+  const PAGE_VERSION = '0.9.1';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -33,7 +33,7 @@
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid' }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid', gnames: false }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -448,7 +448,7 @@
     }
     const menu = $('#liftMenu');
     menu.innerHTML = items.map((m) => '<button role="menuitem" class="mi' + (m.red ? ' red' : '') + '" data-lift="' + m.id + '"><span>' + esc(m.label) + '</span>' + (m.note ? '<span class="mn">' + esc(m.note) + '</span>' : '') + '</button>').join('');
-    const nameGap = el.classList.contains('gi') ? 34 : 0;   // a grid icon's name shows under it once lifted
+    const nameGap = el.classList.contains('gi') && !S.theme.gnames ? 34 : 0;   // a grid icon's name shows under it once lifted
     const below = r.bottom + nameGap + 12 + items.length * 50 < H() - 20;
     menu.style.left = Math.max(14, Math.min(W() - 264, r.left - 14)) + 'px';
     if (below) { menu.style.top = (r.bottom + nameGap + 14) + 'px'; menu.style.transformOrigin = '20% 0'; }
@@ -539,6 +539,7 @@
     const jere = S.jere;
     $('#app').classList.toggle('withicons', S.theme.view !== 'grid' && (S.theme.icons === 'color' || S.theme.icons === 'tint'));
     $('#app').classList.toggle('gridview', S.theme.view === 'grid');
+    $('#app').classList.toggle('gnames', S.theme.view === 'grid' && !!S.theme.gnames);
     $('#cols').hidden = !jere;
     $('#plainList').hidden = jere;
     if (jere) {
@@ -698,6 +699,8 @@
     ['Edit home apps', 'Paper', () => openHomeEditor()],
     ['Icon view', 'Look', () => setTheme({ view: 'grid' })],
     ['Name view', 'Look', () => setTheme({ view: 'list' })],
+    ['Show names', 'Look', () => setTheme({ view: 'grid', gnames: true })],
+    ['Hide names', 'Look', () => setTheme({ view: 'grid', gnames: false })],
     ['Fun stuff', 'Hidden', () => openFun()],
     ['Themes', 'Hidden', () => openThemes()],
     ['Phone notifications', 'Phone', () => call('shade')],
@@ -1034,6 +1037,7 @@
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
     if (d.font) { setTheme({ font: d.font }); return; }
     if (d.view) { setTheme({ view: d.view }); return; }
+    if (d.gnames) { setTheme({ view: 'grid', gnames: d.gnames === 'on' }); return; }
     if (d.layout) { setTheme({ layout: d.layout }); renderHome(); return; }
     if (d.icons) { setTheme({ icons: d.icons }); renderHome(); return; }
     if (d.ficons) { setTheme({ ficons: d.ficons }); renderFolders(); return; }
