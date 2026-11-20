@@ -301,6 +301,8 @@ const path = require('path');
   let fs1 = (await st()).fsec; expect(fs1.k === 1 && Math.round((await st()).hx) === 1, 'swipe up → next section, still on Folders ' + JSON.stringify(fs1)); await shot('54b-folders-section2');
   const firstTop = await p.evaluate(() => { const b = document.querySelector('#tiles').getBoundingClientRect().top; const c = [...document.querySelectorAll('#tiles .fcard')].find((x) => x.getBoundingClientRect().top >= b - 1); return Math.round(c.getBoundingClientRect().top - b); });
   expect(Math.abs(firstTop) <= 1, 'a section starts flush with the top (' + firstTop + ')');
+  const peek = await p.evaluate(() => { const b = document.querySelector('#tiles').getBoundingClientRect(); return [...document.querySelectorAll('#tiles .fcard')].filter((c) => { const r = c.getBoundingClientRect(); return r.bottom > b.top && r.top < b.bottom && (r.top < b.top - 1 || r.bottom > b.bottom + 1) && +getComputedStyle(c).opacity > 0.01; }).length; });
+  expect(peek === 0, 'no half card showing at rest (' + peek + ') ' + JSON.stringify(await p.evaluate(() => { const b = document.querySelector('#tiles').getBoundingClientRect(); return { b: [b.top, b.bottom], cards: [...document.querySelectorAll('#tiles .fcard')].map((c) => { const r = c.getBoundingClientRect(); return [c.querySelector('.fcn').textContent, c.dataset.sec, Math.round(r.top), Math.round(r.bottom), getComputedStyle(c).opacity]; }) }; })));
   await swipe(200, tb0.y + 200, 205, tb0.y + 260, 60, 4); await wait(200);
   expect((await st()).fsec.k === 0, 'a short flick down goes back a section');
   await swipe(200, tb0.y + 300, 200, tb0.y + 330, 600, 8); await wait(200);

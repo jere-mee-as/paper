@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.12.0';
+  const PAGE_VERSION = '0.12.1';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -196,9 +196,11 @@
   // Children rise into place one after another.
   function stagger(box, max) {
     if (!box) return;
-    [...box.children].slice(0, max || 14).forEach((c, i) => {
+    const kids = box.classList.contains('fcol') ? [...box.children].filter((c) => +(c.dataset.sec || 0) === FSEC.k) : [...box.children];   // folder sections: only the cards on screen
+    kids.slice(0, max || 14).forEach((c, i) => {
       c.style.animation = 'none'; void c.offsetWidth;
       c.style.animation = 'rise 560ms cubic-bezier(.22,1,.36,1) ' + (i * 26) + 'ms both';
+      c.addEventListener('animationend', () => { c.style.animation = ''; }, { once: true });   // let go of opacity/transform afterwards
     });
   }
   function staggerHome() { stagger($('#colPeople')); stagger($('#colThings')); stagger($('#gfree'), 14); if (!S.jere) stagger($('#plainList'), 12); }
@@ -766,7 +768,7 @@
           '</section>';
       }).join('');
       box.innerHTML = '<div class="fcol">' + box.innerHTML + '</div>';
-      requestAnimationFrame(measureSections);
+      measureSections(); requestAnimationFrame(measureSections);
       return;
     }
     FSEC.n = 0; $('#fsecdots').innerHTML = '';
@@ -788,6 +790,7 @@
     if (!col) { FSEC.n = 0; return; }
     const h = box.clientHeight, cards = [...col.children], starts = [0];
     cards.forEach((c) => { const top = c.offsetTop, bottom = top + c.offsetHeight; if (bottom - starts[starts.length - 1] > h + 1 && top > starts[starts.length - 1]) starts.push(top); });
+    cards.forEach((c) => { let k = 0; while (k + 1 < starts.length && c.offsetTop >= starts[k + 1]) k++; c.dataset.sec = k; });
     FSEC.starts = starts; FSEC.n = starts.length; FSEC.k = Math.min(FSEC.k, FSEC.n - 1);
     col.style.paddingBottom = Math.max(0, h - (col.scrollHeight - starts[starts.length - 1])) + 'px';
     $('#fsecdots').innerHTML = FSEC.n > 1 ? starts.map(() => '<i></i>').join('') : '';
@@ -803,6 +806,8 @@
     FSEC.pos = pos;
     const col = $('#tiles .fcol'); if (!col) return;
     col.style.transform = 'translate3d(0,' + (-secOffset(pos)) + 'px,0)';
+    // only the current section's cards show at rest (no half card peeking at the bottom); mid-swipe the two cross-fade
+    for (const c of col.children) c.style.opacity = String(Math.max(0, 1 - Math.abs(pos - +(c.dataset.sec || 0)) * 1.4));
     const k = Math.round(Math.max(0, Math.min(FSEC.n - 1, pos)));
     $('#fsecdots').querySelectorAll('i').forEach((d, j) => d.classList.toggle('on', j === k));
   }
