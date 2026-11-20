@@ -294,7 +294,20 @@ const path = require('path');
   // swipe a card with more than one page
   const cmi = await p.evaluate(() => [...document.querySelectorAll('#tiles .fcard')].findIndex((c) => +c.dataset.n > 1));
   expect(cmi >= 0, 'some folder has a second page');
-  await p.evaluate((i) => document.querySelectorAll('#tiles .fcard')[i].scrollIntoView({ block: 'center' }), cmi); await wait(200);
+  // folder sections: the page moves a screenful of cards at a time
+  const fs0 = (await st()).fsec; expect(fs0.n >= 2 && fs0.k === 0, 'folders come in sections ' + JSON.stringify(fs0));
+  const tb0 = await (await p.$('#tiles')).boundingBox();
+  await swipe(200, tb0.y + tb0.height - 120, 210, tb0.y + 140, 320, 14); await wait(200);
+  let fs1 = (await st()).fsec; expect(fs1.k === 1 && Math.round((await st()).hx) === 1, 'swipe up → next section, still on Folders ' + JSON.stringify(fs1)); await shot('54b-folders-section2');
+  const firstTop = await p.evaluate(() => { const b = document.querySelector('#tiles').getBoundingClientRect().top; const c = [...document.querySelectorAll('#tiles .fcard')].find((x) => x.getBoundingClientRect().top >= b - 1); return Math.round(c.getBoundingClientRect().top - b); });
+  expect(Math.abs(firstTop) <= 1, 'a section starts flush with the top (' + firstTop + ')');
+  await swipe(200, tb0.y + 200, 205, tb0.y + 260, 60, 4); await wait(200);
+  expect((await st()).fsec.k === 0, 'a short flick down goes back a section');
+  await swipe(200, tb0.y + 300, 200, tb0.y + 330, 600, 8); await wait(200);
+  expect((await st()).fsec.k === 0, 'pulling down on the first section springs back');
+  // go to the section holding the card to test
+  const want = await p.evaluate((i) => { const c = document.querySelectorAll('#tiles .fcard')[i]; return c.offsetTop; }, cmi);
+  for (let g = 0; g < 4; g++) { const inView = await p.evaluate((i) => { const c = document.querySelectorAll('#tiles .fcard')[i].getBoundingClientRect(), b = document.querySelector('#tiles').getBoundingClientRect(); return c.top >= b.top - 1 && c.bottom <= b.bottom + 1; }, cmi); if (inView) break; await swipe(200, tb0.y + tb0.height - 120, 210, tb0.y + 140, 320, 14); await wait(200); }
   const sb = await (await p.$$('#tiles .fstrip'))[cmi].boundingBox(); const hxB = (await st()).hx;
   await swipe(sb.x + sb.width - 40, sb.y + 40, sb.x + 60, sb.y + 44, 260, 12); await wait(400);
   const pg = await p.evaluate((i) => { const c = document.querySelectorAll('#tiles .fcard')[i]; return { p: c.dataset.p, dot: [...c.querySelectorAll('.fdots i')].findIndex((d) => d.classList.contains('on')) }; }, cmi);

@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.11.0';
+  const PAGE_VERSION = '0.12.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -174,7 +174,7 @@
     if (target !== was) {
       haptic('tick');
       if (target === -1) { renderCal(); stagger($('#days')); }
-      if (target === 1) { renderFolders(); stagger($('#tiles')); }
+      if (target === 1) { renderFolders(); stagger($('#tiles .fcol') || $('#tiles')); }
       if (target === 0 && was !== 0) staggerHome();
     }
     spring('hx', hx, target, v0 || 0, PAGE_SPRING, (v) => { hx = v; paint(); });
@@ -242,8 +242,13 @@
       return;
     }
     if (railPinned && !target.closest('#railPop')) { closeRail(); G = { eat: true }; return; }
+    if (FSEC.n > 1 && target.closest('#tiles.fcards') && !over && !(target.closest('.fstrip') && +target.closest('.fcard').dataset.n > 1)) {
+      stopSpring('hx'); stopSpring('fsec');
+      G = { fsecMaybe: true, x, y, target, pts: [[performance.now(), y]], pos0: FSEC.pos };
+      startHold(target); return;
+    }
     const card = target.closest('.fcard');
-    if (card && +card.dataset.n > 1 && target.closest('.fstrip') && !over) {
+    if (card && +card.dataset.n > 1 && target.closest('.fstrip') && !over) { stopSpring('fsec');
       stopSpring('hx');
       G = { strip: card, x, y, target, page: +(card.dataset.p || 0), n: +card.dataset.n, pts: [[performance.now(), x]] };
       startHold(target); return;
@@ -257,13 +262,33 @@
   function gMove(x, y) {
     if (!G) return false;
     if (G.arrange) { arrangeMove(x, y); return true; }
+    if (G.fsecMaybe) {
+      const dx = x - G.x, dy = y - G.y;
+      if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return false;
+      cancelHold();
+      const s0 = G;
+      if (Math.abs(dx) > Math.abs(dy)) G = { x: s0.x, y: s0.y, target: s0.target, sc: null, axis: '', mode: '', hx0: hx, tS0: tS, tN0: tN, caught: false, pts: [[performance.now(), s0.x, s0.y]] };
+      else G = { fsec: true, x: s0.x, y: s0.y, target: s0.target, pts: [[performance.now(), s0.y]], pos0: s0.pos0 };
+      return gMove(x, y);
+    }
+    if (G.fsec) {
+      cancelHold();
+      const dy = y - G.y, k = Math.round(G.pos0), span = Math.max(120, (FSEC.starts[Math.min(FSEC.n - 1, k + (dy < 0 ? 1 : 0))] - FSEC.starts[Math.max(0, k - (dy > 0 ? 1 : 0))]) || $('#tiles').clientHeight);
+      G.pts.push([performance.now(), y]); if (G.pts.length > 6) G.pts.shift();
+      let pos = G.pos0 - dy / span;
+      if (pos < 0) pos = -rubber(-pos, 1) ; if (pos > FSEC.n - 1) pos = FSEC.n - 1 + rubber(pos - FSEC.n + 1, 1);
+      setSection(pos);
+      return true;
+    }
     if (G.strip) {
       const dx = x - G.x, dy = y - G.y;
       if (!G.axis) {
         if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return false;
         cancelHold();
-        if (Math.abs(dy) > Math.abs(dx) || (dx > 0 && G.page === 0)) {   // up/down scrolls the list; right on page one goes to Home
-          const s0 = G; G = { x: s0.x, y: s0.y, target: s0.target, sc: scroller(s0.target), axis: '', mode: '', hx0: hx, tS0: tS, tN0: tN, caught: false, pts: [[performance.now(), s0.x, s0.y]] };
+        if (Math.abs(dy) > Math.abs(dx) || (dx > 0 && G.page === 0)) {   // up/down moves the sections; right on page one goes to Home
+          const s0 = G;
+          G = Math.abs(dy) > Math.abs(dx) && FSEC.n > 1 ? { fsec: true, x: s0.x, y: s0.y, target: s0.target, pts: [[performance.now(), s0.y]], pos0: FSEC.pos }
+            : { x: s0.x, y: s0.y, target: s0.target, sc: scroller(s0.target), axis: '', mode: '', hx0: hx, tS0: tS, tN0: tN, caught: false, pts: [[performance.now(), s0.x, s0.y]] };
           return gMove(x, y);
         }
         G.axis = 'h'; G.w = G.strip.querySelector('.fstrip').offsetWidth;
@@ -376,6 +401,14 @@
     }
     if (s.seek) { seekAt(x, true); seeking = null; const c = document.querySelector('#nowlist .mcard'); if (c) c.classList.remove('seeking'); haptic('tick'); suppress(); return; }
     if (s.arrange) { arrangeEnd(s); suppress(); return; }
+    if (s.fsecMaybe) return;                       // a tap
+    if (s.fsec) {
+      const v = -vel(s.pts, 1) / Math.max(200, $('#tiles').clientHeight);   // sections per second
+      let t = Math.round(FSEC.pos + v * PROJECT);
+      if (Math.abs(v) > 0.6) t = v > 0 ? Math.ceil(FSEC.pos - 0.02) : Math.floor(FSEC.pos + 0.02);
+      const k0 = Math.round(s.pos0); t = Math.max(k0 - 1, Math.min(k0 + 1, t));
+      goSection(t, v); suppress(); return;
+    }
     if (s.strip) {
       if (!s.axis) return;                       // a tap: the click opens the app
       const v = -vel(s.pts, 1) / s.w;
@@ -718,7 +751,7 @@
     box.className = 'tiles scroll';
     if (S.theme.view === 'grid') {
       // icon view (0.11.0, R3): a card per folder, its apps right there, 4 big icons a page, most used first; swipe a card for its next page
-      box.className = 'fcards scroll';
+      box.className = 'fcards';
       const tint = S.theme.icons === 'tint' ? ' tint' : '';
       box.innerHTML = list.map((f, i) => {
         const apps = byUse(f.keys.map((k) => byKey.get(k)).filter(Boolean));
@@ -732,8 +765,11 @@
           : '<p class="hint fempty">' + (f.auto ? 'Empty.' : 'Empty. Hold the name to add apps.') + '</p>') +
           '</section>';
       }).join('');
+      box.innerHTML = '<div class="fcol">' + box.innerHTML + '</div>';
+      requestAnimationFrame(measureSections);
       return;
     }
+    FSEC.n = 0; $('#fsecdots').innerHTML = '';
     box.innerHTML = list.map((f, i) => {
       const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
       const more = apps.length - 3;
@@ -744,6 +780,39 @@
     }).join('');
   }
 
+  // The Folders page moves in sections, not a free scroll: as many cards as fit the screen, and a swipe up/down
+  // springs to the next set (0.12.0). FSEC.k = section, FSEC.pos = fractional position while dragging.
+  const FSEC = { n: 0, k: 0, pos: 0, starts: [0] };
+  function measureSections() {
+    const box = $('#tiles'), col = box.querySelector('.fcol');
+    if (!col) { FSEC.n = 0; return; }
+    const h = box.clientHeight, cards = [...col.children], starts = [0];
+    cards.forEach((c) => { const top = c.offsetTop, bottom = top + c.offsetHeight; if (bottom - starts[starts.length - 1] > h + 1 && top > starts[starts.length - 1]) starts.push(top); });
+    FSEC.starts = starts; FSEC.n = starts.length; FSEC.k = Math.min(FSEC.k, FSEC.n - 1);
+    col.style.paddingBottom = Math.max(0, h - (col.scrollHeight - starts[starts.length - 1])) + 'px';
+    $('#fsecdots').innerHTML = FSEC.n > 1 ? starts.map(() => '<i></i>').join('') : '';
+    setSection(FSEC.k);
+  }
+  function secOffset(pos) {   // fractional section → px
+    const s = FSEC.starts, i = Math.max(0, Math.min(s.length - 1, Math.floor(pos))), f = pos - i;
+    if (pos < 0) return pos * 120;   // rubber band past the ends
+    if (pos > s.length - 1) return s[s.length - 1] + (pos - s.length + 1) * 120;
+    return s[i] + (i + 1 < s.length ? (s[i + 1] - s[i]) * f : 0);
+  }
+  function setSection(pos) {
+    FSEC.pos = pos;
+    const col = $('#tiles .fcol'); if (!col) return;
+    col.style.transform = 'translate3d(0,' + (-secOffset(pos)) + 'px,0)';
+    const k = Math.round(Math.max(0, Math.min(FSEC.n - 1, pos)));
+    $('#fsecdots').querySelectorAll('i').forEach((d, j) => d.classList.toggle('on', j === k));
+  }
+  function goSection(t, v) {
+    t = Math.max(0, Math.min(FSEC.n - 1, t));
+    if (t !== FSEC.k) haptic('tick');
+    FSEC.k = t;
+    spring('fsec', FSEC.pos, t, v || 0, { response: 0.5, damping: 0.86, eps: 0.0005 }, setSection);
+  }
+  window.addEventListener('resize', () => { if (FSEC.n || $('#tiles .fcol')) measureSections(); });
   // Most used first; ties keep the folder's own order.
   function byUse(apps) {
     const u = S.uses || {};
@@ -1266,7 +1335,7 @@
     },
     bars() { return themeBars; },
     // For the automated checks (src/check.js).
-    state() { return { hx, hxTarget, tS, tN, over, sheet: sheetOpen, lift: liftOpen, folder: folderOpen, rail: railPop.classList.contains('on'), springs: running.size, toy: toyOpen, kind: sheetKind, theme: Object.assign({}, S.theme) }; },
+    state() { return { hx, hxTarget, tS, tN, over, sheet: sheetOpen, lift: liftOpen, folder: folderOpen, rail: railPop.classList.contains('on'), springs: running.size, toy: toyOpen, kind: sheetKind, theme: Object.assign({}, S.theme), fsec: { n: FSEC.n, k: FSEC.k } }; },
     themes() { return TH.map((c) => { const d = derive(c); return { id: c.id, n: c.n, g: c.g, ink: +d.inkMin.toFixed(2), ink2: +d.ink2Min.toFixed(2) }; }); },
     patterns() { return PATS.map((x) => x[0]); },
     toys() { return TOYS.map((t) => t[0]); },
