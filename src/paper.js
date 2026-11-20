@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.10.0';
+  const PAGE_VERSION = '0.11.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -242,6 +242,12 @@
       return;
     }
     if (railPinned && !target.closest('#railPop')) { closeRail(); G = { eat: true }; return; }
+    const card = target.closest('.fcard');
+    if (card && +card.dataset.n > 1 && target.closest('.fstrip') && !over) {
+      stopSpring('hx');
+      G = { strip: card, x, y, target, page: +(card.dataset.p || 0), n: +card.dataset.n, pts: [[performance.now(), x]] };
+      startHold(target); return;
+    }
     // Catch anything in flight.
     const caught = stopSpring('hx') || stopSpring('tS') || stopSpring('tN');
     stopSpring('tS'); stopSpring('tN');
@@ -251,6 +257,23 @@
   function gMove(x, y) {
     if (!G) return false;
     if (G.arrange) { arrangeMove(x, y); return true; }
+    if (G.strip) {
+      const dx = x - G.x, dy = y - G.y;
+      if (!G.axis) {
+        if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return false;
+        cancelHold();
+        if (Math.abs(dy) > Math.abs(dx) || (dx > 0 && G.page === 0)) {   // up/down scrolls the list; right on page one goes to Home
+          const s0 = G; G = { x: s0.x, y: s0.y, target: s0.target, sc: scroller(s0.target), axis: '', mode: '', hx0: hx, tS0: tS, tN0: tN, caught: false, pts: [[performance.now(), s0.x, s0.y]] };
+          return gMove(x, y);
+        }
+        G.axis = 'h'; G.w = G.strip.querySelector('.fstrip').offsetWidth;
+      }
+      G.pts.push([performance.now(), x]); if (G.pts.length > 6) G.pts.shift();
+      let pos = G.page - dx / G.w;
+      if (pos < 0) pos = -rubber(-pos, 1); if (pos > G.n - 1) pos = G.n - 1 + rubber(pos - G.n + 1, 1);
+      G.pos = pos; stripSet(G.strip, pos, false);
+      return true;
+    }
     G.lx = x; G.ly = y;
     if (G.rail) { railMove(y, x); return true; }
     if (G.seek) { seekAt(x); return true; }
@@ -353,6 +376,15 @@
     }
     if (s.seek) { seekAt(x, true); seeking = null; const c = document.querySelector('#nowlist .mcard'); if (c) c.classList.remove('seeking'); haptic('tick'); suppress(); return; }
     if (s.arrange) { arrangeEnd(s); suppress(); return; }
+    if (s.strip) {
+      if (!s.axis) return;                       // a tap: the click opens the app
+      const v = -vel(s.pts, 1) / s.w;
+      let t = Math.round((s.pos != null ? s.pos : s.page) + v * PROJECT);
+      if (Math.abs(v) > 0.9) t = s.page + (v > 0 ? 1 : -1);
+      t = Math.max(0, Math.min(s.n - 1, Math.max(s.page - 1, Math.min(s.page + 1, t))));
+      if (t !== s.page) haptic('tick');
+      s.strip.dataset.p = t; stripSet(s.strip, t, true); suppress(); return;
+    }
     if (s.rail) { railEnd(x, y); suppress(); return; }
     if (s.eat) { suppress(); return; }
     if (s.dots) {
@@ -685,16 +717,20 @@
     }
     box.className = 'tiles scroll';
     if (S.theme.view === 'grid') {
-      // icon view: each tile previews what's inside (up to 8 icons; a full folder ends on +N)
+      // icon view (0.11.0, R3): a card per folder, its apps right there, 4 big icons a page, most used first; swipe a card for its next page
+      box.className = 'fcards scroll';
+      const tint = S.theme.icons === 'tint' ? ' tint' : '';
       box.innerHTML = list.map((f, i) => {
-        const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
-        const shown = apps.length > 8 ? apps.slice(0, 7) : apps;
-        const cells = shown.map(appIcon);
-        if (apps.length > 8) cells.push('<span class="tm more">+' + (apps.length - 7) + '</span>');
-        while (cells.length < 8) cells.push('<span class="tm"></span>');
-        return '<button class="tile tg" data-tile="' + i + '" data-label="' + esc(f.name) + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '">' +
-          '<span class="tmini' + (S.theme.icons === 'tint' ? ' tint' : '') + '">' + cells.join('') + '</span>' +
-          '<span class="tname tgn" data-label="' + esc(f.name) + '">' + folderIcon(f, 20) + '<span>' + esc(f.name) + '</span><span class="mono tc">' + String(apps.length).padStart(2, '0') + '</span></span></button>';
+        const apps = byUse(f.keys.map((k) => byKey.get(k)).filter(Boolean));
+        const pages = [];
+        for (let p = 0; p < apps.length; p += 4) pages.push(apps.slice(p, p + 4));
+        return '<section class="fcard" data-n="' + pages.length + '">' +
+          '<button class="fch" data-tile="' + i + '" data-label="' + esc(f.name) + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '">' + folderIcon(f, 22) + '<span class="fcn">' + esc(f.name) + '</span><span class="mono fcc">' + String(apps.length).padStart(2, '0') + '</span></button>' +
+          (apps.length ? '<div class="fstrip"><div class="fpages' + tint + '">' + pages.map((pg) => '<div class="fpg">' + pg.map((a) =>
+            '<button class="fi fb" data-open="' + esc(a.key) + '" data-label="' + esc(a.label) + '" data-hold="infolder:' + i + '" data-key="' + esc(a.key) + '">' + appIcon(a) + '<span class="fil">' + esc(shortName(a.label)) + '</span></button>').join('') + '</div>').join('') + '</div></div>' +
+            (pages.length > 1 ? '<div class="fdots">' + pages.map((_, p) => '<i class="' + (p ? '' : 'on') + '"></i>').join('') + '</div>' : '')
+          : '<p class="hint fempty">' + (f.auto ? 'Empty.' : 'Empty. Hold the name to add apps.') + '</p>') +
+          '</section>';
       }).join('');
       return;
     }
@@ -708,6 +744,19 @@
     }).join('');
   }
 
+  // Most used first; ties keep the folder's own order.
+  function byUse(apps) {
+    const u = S.uses || {};
+    return apps.map((a, i) => [a, i]).sort((x, y) => (u[y[0].key] || 0) - (u[x[0].key] || 0) || x[1] - y[1]).map((x) => x[0]);
+  }
+  // Swiping a folder card pages through its apps; it snaps a page at a time. On the first page a swipe right still goes back to Home.
+  function stripSet(card, pos, anim) {
+    const pg = card.querySelector('.fpages');
+    pg.style.transition = anim ? 'transform .38s cubic-bezier(.22,1,.36,1)' : 'none';
+    pg.style.transform = 'translate3d(' + (-pos * 100) + '%,0,0)';
+    const k = Math.round(pos);
+    card.querySelectorAll('.fdots i').forEach((d, j) => d.classList.toggle('on', j === k));
+  }
   // A folder opens out of its tile: the card springs from the tile's rectangle to the middle of the screen.
   let folderOpen = -1;
   function openFolder(i) {

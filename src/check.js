@@ -289,8 +289,31 @@ const path = require('path');
   expect((await p.evaluate(() => __launched.length)) === nL + 1, 'tapping an icon opens the app');
   await p.evaluate(() => PAPER.onNative('home', null)); await settle();
   await swipe(330, 450, 60, 450); await wait(300); await shot('54-grid-folders');
-  const tg = await p.evaluate(() => ({ tiles: document.querySelectorAll('#tiles .tile.tg').length, cells: [...document.querySelectorAll('#tiles .tmini')].map((m) => m.children.length), cut: [...document.querySelectorAll('#tiles .tgn>span:not(.tc)')].filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent) }));
-  expect(tg.tiles >= 8 && tg.cells.every((n) => n === 8) && !tg.cut.length, 'folder tiles preview 8 cells and names fit ' + JSON.stringify(tg));
+  const fc = await p.evaluate(() => ({ cards: document.querySelectorAll('#tiles .fcard').length, big: Math.round(document.querySelector('#tiles .fb .fic').getBoundingClientRect().width), perPage: [...document.querySelector('#tiles .fpg').children].length, multi: [...document.querySelectorAll('#tiles .fcard')].filter((c) => +c.dataset.n > 1).map((c) => c.querySelector('.fcn').textContent), cut: [...document.querySelectorAll('#tiles .fcn')].filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent) }));
+  expect(fc.cards >= 8 && fc.big >= 64 && fc.perPage <= 4 && !fc.cut.length, 'folder cards with big icons, 4 a page ' + JSON.stringify(fc));
+  // swipe a card with more than one page
+  const cmi = await p.evaluate(() => [...document.querySelectorAll('#tiles .fcard')].findIndex((c) => +c.dataset.n > 1));
+  expect(cmi >= 0, 'some folder has a second page');
+  await p.evaluate((i) => document.querySelectorAll('#tiles .fcard')[i].scrollIntoView({ block: 'center' }), cmi); await wait(200);
+  const sb = await (await p.$$('#tiles .fstrip'))[cmi].boundingBox(); const hxB = (await st()).hx;
+  await swipe(sb.x + sb.width - 40, sb.y + 40, sb.x + 60, sb.y + 44, 260, 12); await wait(400);
+  const pg = await p.evaluate((i) => { const c = document.querySelectorAll('#tiles .fcard')[i]; return { p: c.dataset.p, dot: [...c.querySelectorAll('.fdots i')].findIndex((d) => d.classList.contains('on')) }; }, cmi);
+  expect(pg.p === '1' && pg.dot === 1 && (await st()).hx === hxB, 'swiping a card shows its next page, launcher stays put ' + JSON.stringify(pg)); await shot('55a-card-page2');
+  const nL3 = await p.evaluate(() => __launched.length); const vis = await p.evaluate((i) => { const c = document.querySelectorAll('#tiles .fcard')[i], s = c.querySelector('.fstrip').getBoundingClientRect(); const b = [...c.querySelectorAll('.fb')].find((x) => { const r = x.getBoundingClientRect(); return r.left >= s.left && r.right <= s.right; }); return b ? b.dataset.label : ''; }, cmi);
+  const vb = await p.evaluate((l) => { const b = [...document.querySelectorAll('#tiles .fb')].find((x) => x.dataset.label === l); const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + 30]; }, vis);
+  await touch('touchStart', vb[0], vb[1]); await wait(40); await touch('touchEnd'); await wait(200);
+  expect((await p.evaluate(() => __launched.length)) === nL3 + 1, 'tapping an app on page 2 opens it (' + vis + ')');
+  await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await swipe(330, 450, 60, 450); await wait(300);
+  // most used first
+  const order = await p.evaluate(() => { const c = document.querySelector('#tiles .fcard'); return [...c.querySelectorAll('.fb')].map((x) => x.dataset.key); });
+  await p.evaluate((k) => { for (let i = 0; i < 5; i++) PaperNative.launch(k); }, order[order.length - 1]);
+  await p.evaluate((k) => { const S = JSON.parse(localStorage.getItem(Object.keys(localStorage).find((x) => /paper/i.test(x)))); }, 0);
+  await p.evaluate((k) => { const b = [...document.querySelectorAll('#tiles .fb')].find((x) => x.dataset.key === k); for (let i = 0; i < 5; i++) b.click(); }, order[order.length - 1]);
+  await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await swipe(330, 450, 60, 450); await wait(300);
+  expect((await p.evaluate(() => document.querySelector('#tiles .fcard .fb').dataset.key)) === order[order.length - 1], 'the app you open most moves to the front of its folder');
+  // swipe right on page one of a card still goes back Home
+  const fb0 = await (await p.$('#tiles .fstrip')).boundingBox(); await swipe(fb0.x + 40, fb0.y + 40, fb0.x + 300, fb0.y + 40); await settle();
+  expect(Math.round((await st()).hx) === 0, 'swipe right on a card\'s first page goes Home'); await swipe(330, 450, 60, 450); await wait(300);
   await tapEl('[data-tile="1"]'); await settle(); await wait(300); await shot('55-grid-folder-open');
   const cols = await p.evaluate(() => getComputedStyle(document.querySelector('#fview .ficons')).gridTemplateColumns.split(' ').length);
   const big = await p.evaluate(() => document.querySelector('#fview .fi .fic').getBoundingClientRect().width);
