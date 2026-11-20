@@ -409,3 +409,21 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
 #app.gnames .gi{gap:6px}
 #app.gnames.ledger .gi .fil{font-family:var(--mono);font-size:10.5px}
 #app.gnames #liftItem.fi .fil{background:none;color:var(--ink);padding:0;font-size:12px}
+
+[hidden]{display:none!important}
+/* grid + dock (0.10.0): one free grid you arrange by dragging, a dock of up to 5 at the thumb */
+#gfree{margin-top:44px;margin-left:-10px;padding-left:10px;padding-right:28px;flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,64px);justify-content:space-between;align-content:start;row-gap:22px;padding-bottom:150px}
+#app.gnames #gfree{row-gap:16px}
+#hdock{position:absolute;left:14px;right:14px;bottom:calc(var(--bot,16px) + 66px);height:88px;border-radius:30px;padding:0 14px;z-index:2;
+  display:flex;align-items:center;justify-content:space-around;background:rgba(var(--inkRGB),.07);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#app.shellish #hdock{background:rgba(10,10,10,.5)}
+#hdock .gi .fil{display:none!important}
+#hdock .gi .fic{width:60px;height:60px;border-radius:17px}
+#app.docked #rail{bottom:calc(var(--bot,16px) + 166px)}
+.gi.dragging{visibility:hidden}
+#dragGhost{position:absolute;z-index:20;pointer-events:none;transition:transform .2s var(--pop),left .24s var(--ease),top .24s var(--ease)}
+#dragGhost.up{transform:scale(1.12);transition:transform .2s var(--pop)}
+#dragGhost .gi{display:block;padding:0}
+#dragGhost .fil{display:none!important}
+#dragGhost .fic{width:64px;height:64px;border-radius:18px;box-shadow:0 14px 30px rgba(0,0,0,.25)}
+#app.arranging #gfree .gi,#app.arranging #hdock .gi{transition:transform .22s var(--ease)}

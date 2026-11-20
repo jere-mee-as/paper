@@ -343,7 +343,7 @@
     st.setProperty('--fs', String(FS[f[0]] || 1));
     document.documentElement.dataset.font = f[0];
   }
-  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('view' in patch || 'gnames' in patch || 'layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
+  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('view' in patch || 'gnames' in patch || 'org' in patch || 'layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
   function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
@@ -356,6 +356,7 @@
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
       '<div class="grp"><p class="mono">View</p><div class="seg"><button class="btn sm" data-view="grid">Icons</button><button class="btn sm" data-view="list">Names</button></div>' +
+        '<p class="hint" style="margin:14px 0 8px">Arrange Home</p><div class="seg"><button class="btn sm" data-org="dock">Grid + dock</button><button class="btn sm" data-org="split">People & Things</button></div>' +
         '<p class="hint" style="margin:14px 0 8px">Names under the icons</p><div class="seg"><button class="btn sm" data-gnames="on">On</button><button class="btn sm" data-gnames="off">Off</button></div>' +
         '<p class="hint" style="margin:8px 0 0">Icons: Home is a grid of icons (hold one for its name), folder tiles preview what\'s inside, an open folder shows big icons. Names: the lists.</p></div>' +
       '<div class="grp"><p class="mono">Layout</p><div class="seg"><button class="btn sm" data-layout="paper">Paper</button><button class="btn sm" data-layout="shell">SHELL</button></div>' +
@@ -381,6 +382,7 @@
     document.querySelectorAll('#sbody [data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === c.id));
     document.querySelectorAll('#sbody [data-str]').forEach((b) => b.classList.toggle('on', b.dataset.str === S.theme.str));
     [['view', 'grid'], ['layout', 'paper'], ['icons', 'off'], ['ficons', 'off']].forEach(([k, d]) => document.querySelectorAll('#sbody [data-' + k + ']').forEach((b) => b.classList.toggle('on', b.dataset[k] === (S.theme[k] || d))));
+    document.querySelectorAll('#sbody [data-org]').forEach((b) => b.classList.toggle('on', S.theme.view === 'grid' && b.dataset.org === (S.theme.org || 'dock')));
     document.querySelectorAll('#sbody [data-gnames]').forEach((b) => b.classList.toggle('on', S.theme.view === 'grid' && (b.dataset.gnames === 'on') === !!S.theme.gnames));
     document.querySelectorAll('#sbody [data-font]').forEach((b) => b.classList.toggle('on', b.dataset.font === (S.theme.font || 'paper')));
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');

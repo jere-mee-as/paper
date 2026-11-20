@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.9.1';
+  const PAGE_VERSION = '0.10.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -33,7 +33,13 @@
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid', gnames: false }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid', gnames: false, org: 'dock' }, S.theme || {});
+  // One free grid + a dock (0.10.0): its own arrangement, seeded once from People and Things.
+  if (!S.home.grid || !S.home.dock) {
+    const DOCK = ['Phone', 'Messages', 'Brave', 'Claude'], all = [...S.home.people, ...S.home.things].map((h) => Object.assign({}, h));
+    S.home.dock = DOCK.map((n) => all.find((h) => h.name === n)).filter(Boolean);
+    S.home.grid = all.filter((h) => !S.home.dock.includes(h));
+  }
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -54,7 +60,7 @@
     return null;
   }
   function resolveHome() {
-    ['people', 'things'].forEach((c) => S.home[c].forEach((h) => {
+    ['people', 'things', 'grid', 'dock'].forEach((c) => (S.home[c] || []).forEach((h) => {
       if (h.key && byKey.has(h.key)) return;
       const a = findApp(h.alias && h.alias.length ? h.alias : [h.name]);
       h.key = a ? a.key : '';
@@ -195,7 +201,7 @@
       c.style.animation = 'rise 560ms cubic-bezier(.22,1,.36,1) ' + (i * 26) + 'ms both';
     });
   }
-  function staggerHome() { stagger($('#colPeople')); stagger($('#colThings')); if (!S.jere) stagger($('#plainList'), 12); }
+  function staggerHome() { stagger($('#colPeople')); stagger($('#colThings')); stagger($('#gfree'), 14); if (!S.jere) stagger($('#plainList'), 12); }
 
   // ------------------------------------------------------------------ gestures
   // Touch drives everything (mouse too, for the desktop preview). Touching anything that is moving
@@ -244,6 +250,8 @@
   }
   function gMove(x, y) {
     if (!G) return false;
+    if (G.arrange) { arrangeMove(x, y); return true; }
+    G.lx = x; G.ly = y;
     if (G.rail) { railMove(y, x); return true; }
     if (G.seek) { seekAt(x); return true; }
     if (G.notif) {
@@ -344,6 +352,7 @@
       return;
     }
     if (s.seek) { seekAt(x, true); seeking = null; const c = document.querySelector('#nowlist .mcard'); if (c) c.classList.remove('seeking'); haptic('tick'); suppress(); return; }
+    if (s.arrange) { arrangeEnd(s); suppress(); return; }
     if (s.rail) { railEnd(x, y); suppress(); return; }
     if (s.eat) { suppress(); return; }
     if (s.dots) {
@@ -421,10 +430,55 @@
     holdEl = el; el.classList.add('pressing');
     holdT = setTimeout(() => {
       holdT = 0; el.classList.remove('pressing');
+      if (/^home:(grid|dock):/.test(el.dataset.hold) && G && G.x != null) { const g0 = G; G = null; suppress(); haptic('long'); arrangeStart(el, g0.lx != null ? g0.lx : g0.x, g0.ly != null ? g0.ly : g0.y); return; }
       G = null; suppress();
       haptic('long');
       onHold(el);
     }, 450);
+  }
+  // Hold an app on the free grid or the dock: it lifts and follows the finger; drop it anywhere to rearrange
+  // (into the dock too, up to 5). Let go without moving and its menu opens instead.
+  const DOCK_MAX = 5;
+  function arrangeStart(el, x, y) {
+    const [, c, i] = el.dataset.hold.split(':');
+    const h = S.home[c][+i]; if (!h) return;
+    const r = el.querySelector('.fic').getBoundingClientRect();
+    // The touched button itself becomes the ghost: it has to stay in the page, or the browser stops sending this finger's moves.
+    const gh = document.createElement('div'); gh.id = 'dragGhost';
+    gh.style.left = r.left + 'px'; gh.style.top = r.top + 'px'; $('#app').appendChild(gh); gh.appendChild(el);
+    G = { arrange: true, el, h, c, i: +i, x0: x, y0: y, ox: x - r.left, oy: y - r.top, moved: false, gh };
+    h._drag = true; $('#app').classList.add('arranging'); renderHome();
+    requestAnimationFrame(() => gh.classList.add('up'));
+  }
+  function arrangeMove(x, y) {
+    const d = G;
+    if (!d.moved && Math.hypot(x - d.x0, y - d.y0) < 10) return;
+    d.moved = true;
+    d.gh.style.left = (x - d.ox) + 'px'; d.gh.style.top = (y - d.oy) + 'px';
+    // where would it land?
+    const dr = $('#hdock').getBoundingClientRect();
+    const toDock = y > dr.top - 18 && (d.c === 'dock' || S.home.dock.length < DOCK_MAX);
+    const c = toDock ? 'dock' : 'grid', L = S.home[c];
+    const els = [...document.querySelectorAll(c === 'dock' ? '#hdock .gi:not(.dragging)' : '#gfree .gi:not(.dragging)')];
+    let idx = els.length;
+    for (let k = 0; k < els.length; k++) {
+      const r = els[k].getBoundingClientRect();
+      if (c === 'dock' ? x < r.left + r.width / 2 : (y < r.bottom && (x < r.left + r.width / 2 || y < r.top))) { idx = k; break; }
+    }
+    // idx counts the apps without the dragged one
+    const from = S.home[d.c].indexOf(d.h);
+    if (c === d.c && idx === from) return;
+    S.home[d.c].splice(from, 1);
+    L.splice(Math.min(idx, L.length), 0, d.h); d.c = c;
+    haptic('tick'); renderHome();
+  }
+  function arrangeEnd(d) {
+    delete d.h._drag; $('#app').classList.remove('arranging');
+    if (!d.moved) { d.gh.remove(); renderHome(); const el = document.querySelector('[data-hold="home:' + d.c + ':' + S.home[d.c].indexOf(d.h) + '"]'); if (el) onHold(el); return; }
+    save(); renderHome();
+    const t = document.querySelector('[data-hold="home:' + d.c + ':' + S.home[d.c].indexOf(d.h) + '"] .fic');
+    if (t) { const r = t.getBoundingClientRect(); d.gh.classList.remove('up'); d.gh.style.left = r.left + 'px'; d.gh.style.top = r.top + 'px'; t.style.opacity = '0'; setTimeout(() => { d.gh.remove(); t.style.opacity = ''; }, 260); }
+    else d.gh.remove();
   }
   function cancelHold() {
     if (holdT) { clearTimeout(holdT); holdT = 0; }
@@ -528,8 +582,9 @@
   function appBtn(h, where) {
     const ok = h.key && byKey.has(h.key);
     if (S.theme.view === 'grid') {
+      if (where.startsWith('home:dock:')) return '<button class="fi gi' + (ok ? '' : ' missing') + (h._drag ? ' dragging' : '') + (S.theme.icons === 'tint' ? ' tint' : '') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '" aria-label="' + esc(h.name) + '">' + appIcon(byKey.get(h.key) || { label: h.name }) + '</button>';
       // icon view: the icon alone; holding it lifts it with its name underneath
-      return '<button class="fi gi' + (ok ? '' : ' missing') + (S.theme.icons === 'tint' ? ' tint' : '') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '" aria-label="' + esc(h.name) + '">' +
+      return '<button class="fi gi' + (ok ? '' : ' missing') + (h._drag ? ' dragging' : '') + (S.theme.icons === 'tint' ? ' tint' : '') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '" aria-label="' + esc(h.name) + '">' +
         appIcon(byKey.get(h.key) || { label: h.name }) + '<span class="fil">' + esc(h.name) + '</span></button>';
     }
     return '<button class="app' + (ok ? '' : ' missing') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '">' + homeIcon(h.key) + '<span class="an">' + esc(h.name) + '</span></button>';
@@ -540,7 +595,14 @@
     $('#app').classList.toggle('withicons', S.theme.view !== 'grid' && (S.theme.icons === 'color' || S.theme.icons === 'tint'));
     $('#app').classList.toggle('gridview', S.theme.view === 'grid');
     $('#app').classList.toggle('gnames', S.theme.view === 'grid' && !!S.theme.gnames);
-    $('#cols').hidden = !jere;
+    const docked = jere && S.theme.view === 'grid' && S.theme.org === 'dock';
+    $('#app').classList.toggle('docked', docked);
+    $('#gfree').hidden = !docked; $('#hdock').hidden = !docked;
+    if (docked) {
+      $('#gfree').innerHTML = S.home.grid.map((h, i) => appBtn(h, 'home:grid:' + i)).join('');
+      $('#hdock').innerHTML = S.home.dock.map((h, i) => appBtn(h, 'home:dock:' + i)).join('');
+    }
+    $('#cols').hidden = !jere || (S.theme.view === 'grid' && S.theme.org === 'dock');
     $('#plainList').hidden = jere;
     if (jere) {
       $('#colPeople').innerHTML = S.home.people.map((h, i) => appBtn(h, 'home:people:' + i)).join('');
@@ -700,6 +762,8 @@
     ['Icon view', 'Look', () => setTheme({ view: 'grid' })],
     ['Name view', 'Look', () => setTheme({ view: 'list' })],
     ['Show names', 'Look', () => setTheme({ view: 'grid', gnames: true })],
+    ['Dock and grid', 'Look', () => setTheme({ view: 'grid', org: 'dock' })],
+    ['People and Things', 'Look', () => setTheme({ org: 'split' })],
     ['Hide names', 'Look', () => setTheme({ view: 'grid', gnames: false })],
     ['Fun stuff', 'Hidden', () => openFun()],
     ['Themes', 'Hidden', () => openThemes()],
@@ -724,13 +788,14 @@
     out.push({ n: 'Find “' + q + '” on the map', w: 'Maps', f: () => call('maps', q), q, maps: true });
     return out;
   }
+  const homeAll = () => (S.theme.view === 'grid' && S.theme.org === 'dock' ? [...S.home.grid, ...S.home.dock] : [...S.home.people, ...S.home.things]);
   function whereIs(key) {
-    if (S.jere && [...S.home.people, ...S.home.things].some((h) => h.key === key)) return 'Home';
+    if (S.jere && homeAll().some((h) => h.key === key)) return 'Home';
     const f = S.jere && S.folders.find((x) => x.keys.includes(key));
     return f ? f.name : 'App';
   }
   function suggested() {
-    const homeKeys = new Set(S.jere ? [...S.home.people, ...S.home.things].map((h) => h.key) : []);
+    const homeKeys = new Set(S.jere ? homeAll().map((h) => h.key) : []);
     const used = Object.entries(S.uses || {}).filter(([k]) => byKey.has(k)).sort((a, b) => b[1] - a[1]).map(([k]) => k);
     const picks = used.filter((k) => !homeKeys.has(k));
     for (const f of S.folders || []) for (const k of f.keys) { if (picks.length >= 8) break; if (!picks.includes(k) && byKey.has(k) && !homeKeys.has(k)) picks.push(k); }
@@ -975,7 +1040,8 @@
       '<button class="btn sm" data-act="rmhome" data-w="home:' + c + ':' + i + '">Remove</button></span></div>').join('') +
       '<div class="btnrow"><button class="btn" data-act="addhome" data-c="' + c + '">+ Add to ' + label + '</button></div></div>';
     sheetKind = 'home';
-    openSheet('<h2>Home apps</h2><p class="hint" style="margin-top:0">Seven a column fits best. Hold any app on Home for the same options.</p>' + col('people', 'People') + col('things', 'Things'));
+    if (S.theme.view === 'grid' && S.theme.org === 'dock') openSheet('<h2>Home apps</h2><p class="hint" style="margin-top:0">Or hold an app on Home and drag it where you want it.</p>' + col('grid', 'Grid') + col('dock', 'Dock'));
+    else openSheet('<h2>Home apps</h2><p class="hint" style="margin-top:0">Seven a column fits best. Hold any app on Home for the same options.</p>' + col('people', 'People') + col('things', 'Things'));
   }
 
   // ------------------------------------------------------------------ settings + updates
@@ -1037,6 +1103,7 @@
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
     if (d.font) { setTheme({ font: d.font }); return; }
     if (d.view) { setTheme({ view: d.view }); return; }
+    if (d.org) { setTheme({ view: 'grid', org: d.org }); return; }
     if (d.gnames) { setTheme({ view: 'grid', gnames: d.gnames === 'on' }); return; }
     if (d.layout) { setTheme({ layout: d.layout }); renderHome(); return; }
     if (d.icons) { setTheme({ icons: d.icons }); renderHome(); return; }

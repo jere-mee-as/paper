@@ -276,7 +276,7 @@ const path = require('path');
   await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', ficons: 'off', icons: 'off', font: 'paper' })); await p.evaluate(() => PAPER.onNative('resume', null)); await wait(400);
   expect(!(await p.$('#app.ledger')) && !(await p.$('#cols .hic')), 'back to Paper defaults');
   // icon view (0.9.0): H3 home grid, F1 tile previews, F3 big icons in an open folder
-  await p.evaluate(() => PAPER.setTheme({ view: 'grid' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(400); await shot('52-grid-home');
+  await p.evaluate(() => PAPER.setTheme({ view: 'grid', org: 'split' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(400); await shot('52-grid-home');
   const gh = await p.evaluate(() => { const g = [...document.querySelectorAll('#cols .gi')]; return { n: g.length, named: g.filter((x) => x.querySelector('.fil').offsetWidth > 0).length, tops: g.slice(0, 5).map((x) => Math.round(x.getBoundingClientRect().top)), right: Math.max(...g.map((x) => x.getBoundingClientRect().right)), rail: document.querySelector('#rail').getBoundingClientRect().left, withicons: document.querySelector('#app').classList.contains('withicons') }; });
   expect(gh.n === 14 && gh.named === 0, 'home is 14 bare icons ' + JSON.stringify(gh));
   expect(gh.tops[0] === gh.tops[3] && gh.tops[4] > gh.tops[3], 'four icons per row ' + gh.tops);
@@ -310,6 +310,36 @@ const path = require('path');
   expect((await p.$$('#cols .gi.tint')).length === 14, 'Tinted recolors the grid');
   await swipe(60, 450, 330, 450); await settle(); await shot('57b-grid-shell-names'); await swipe(330, 450, 60, 450); await swipe(330, 450, 60, 450); await wait(300); await shot('57-grid-shell-folders');
   await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', icons: 'off', ficons: 'off', gnames: false })); await p.evaluate(() => PAPER.onNative('home', null)); await settle();
+  // grid + dock (0.10.0)
+  await p.evaluate(() => PAPER.setTheme({ org: 'dock', gnames: true })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(400); await shot('60-dock-home');
+  const dk = await p.evaluate(() => ({ grid: document.querySelectorAll('#gfree .gi').length, dock: [...document.querySelectorAll('#hdock .gi')].map((x) => x.dataset.label), cols: document.querySelector('#cols').hidden, railB: document.querySelector('#rail').getBoundingClientRect().bottom, dockT: document.querySelector('#hdock').getBoundingClientRect().top, gridB: Math.max(...[...document.querySelectorAll('#gfree .gi')].map((x) => x.getBoundingClientRect().bottom)) }));
+  expect(dk.grid === 10 && dk.dock.join() === 'Phone,Messages,Brave,Claude' && dk.cols, 'grid of 10 + dock of Phone, Messages, Brave, Claude ' + JSON.stringify(dk));
+  expect(dk.railB <= dk.dockT && dk.gridB <= dk.dockT, 'rail and grid stay above the dock ' + JSON.stringify(dk));
+  const nL2 = await p.evaluate(() => __launched.length); await tapEl('#hdock .gi'); await wait(200); expect((await p.evaluate(() => __launched.length)) === nL2 + 1, 'tapping a dock icon opens it'); await p.evaluate(() => PAPER.onNative('home', null)); await settle();
+  async function drag(sel, tx, ty) { const b = await (await p.$(sel)).boundingBox(); const x0 = b.x + 32, y0 = b.y + 32; await touch('touchStart', x0, y0); await wait(560); for (let i = 1; i <= 14; i++) { await touch('touchMove', x0 + (tx - x0) * i / 14, y0 + (ty - y0) * i / 14); await wait(25); } await wait(150); await touch('touchEnd'); await wait(450); }
+  // hold without moving → menu
+  const hb = await (await p.$('#gfree .gi')).boundingBox(); await touch('touchStart', hb.x + 30, hb.y + 30); await wait(620); await touch('touchEnd'); await wait(450);
+  expect((await st()).lift, 'hold and let go → the menu'); await shot('61-dock-hold-menu'); await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  // drag the dFirst grid app (WhatsApp) into the dock between Messages and Brave
+  const dFirst = await p.$eval('#gfree .gi', (e) => e.dataset.label);
+  const m = await (await p.$('#hdock .gi:nth-child(2)')).boundingBox(), br = await (await p.$('#hdock .gi:nth-child(3)')).boundingBox();
+  await drag('#gfree .gi', (m.x + m.width + br.x) / 2 + 2, m.y + m.height / 2); await shot('62-dock-dropped');
+  const after = await p.evaluate(() => ({ dock: [...document.querySelectorAll('#hdock .gi')].map((x) => x.dataset.label), grid: document.querySelectorAll('#gfree .gi').length, ghost: !!document.querySelector('#dragGhost') }));
+  expect(after.dock.length === 5 && after.dock[2] === dFirst && after.grid === 9, 'dragged ' + dFirst + ' into the dock ' + JSON.stringify(after));
+  // reorder inside the grid: drag the last grid app to the dFirst spot
+  const dLast = await p.$eval('#gfree .gi:last-child', (e) => e.dataset.label); const f0 = await (await p.$('#gfree .gi')).boundingBox();
+  await drag('#gfree .gi:last-child', f0.x + 8, f0.y + 30);
+  expect((await p.$eval('#gfree .gi', (e) => e.dataset.label)) === dLast, 'dragging ' + dLast + ' to the front of the grid'); await shot('63-dock-reordered');
+  // dock is full at 5: dragging another grid app down leaves it in the grid
+  const d5 = await (await p.$('#hdock')).boundingBox(); await drag('#gfree .gi:nth-child(2)', d5.x + 40, d5.y + 44);
+  expect((await p.$$('#hdock .gi')).length === 5 && (await p.$$('#gfree .gi')).length === 9, 'dock stops at 5');
+  // drag one back out of the dock into the grid
+  await drag('#hdock .gi:nth-child(3)', f0.x + 8, f0.y + 30);
+  expect((await p.$$('#hdock .gi')).length === 4 && (await p.$eval('#gfree .gi', (e) => e.dataset.label)) === dFirst, 'drag back out of the dock');
+  await p.reload(); await wait(800); expect((await p.$eval('#gfree .gi', (e) => e.dataset.label)) === dFirst, 'arrangement survives a reload');
+  expect(!(await p.$('#dragGhost')), 'no ghost left behind');
+  await p.evaluate(() => PAPER.setTheme({ color: 's-ember', layout: 'shell' })); await wait(500); await shot('64-dock-shell');
+  await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', gnames: false })); await wait(300);
   // weather
   await p.evaluate(() => PAPER.setTheme({ color: 'sun-night', pat: 'none', wx: 'rain' })); await wait(700);
   let wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'rain' && wx.running && wx.drops > 20, 'rain falls ' + JSON.stringify(wx)); await shot('25-weather-rain-night');
