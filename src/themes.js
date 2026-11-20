@@ -343,7 +343,7 @@
     st.setProperty('--fs', String(FS[f[0]] || 1));
     document.documentElement.dataset.font = f[0];
   }
-  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
+  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('view' in patch || 'layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
   function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
@@ -355,9 +355,11 @@
     FONTS.forEach(loadFont);   // so the font tiles show themselves
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
+      '<div class="grp"><p class="mono">View</p><div class="seg"><button class="btn sm" data-view="grid">Icons</button><button class="btn sm" data-view="list">Names</button></div>' +
+        '<p class="hint" style="margin:8px 0 0">Icons: Home is a grid of icons (hold one for its name), folder tiles preview what\'s inside, an open folder shows big icons. Names: the lists.</p></div>' +
       '<div class="grp"><p class="mono">Layout</p><div class="seg"><button class="btn sm" data-layout="paper">Paper</button><button class="btn sm" data-layout="shell">SHELL</button></div>' +
         '<p class="hint" style="margin:8px 0 0">SHELL: everything in JetBrains Mono, a ledger of today on the left, the time stacked thin on the right. Works with any color.</p></div>' +
-      '<div class="grp"><p class="mono">Icons</p><p class="hint" style="margin:0 0 8px">Beside app names on Home</p><div class="seg3"><button class="btn sm" data-icons="off">Off</button><button class="btn sm" data-icons="color">App colors</button><button class="btn sm" data-icons="tint">Tinted</button></div>' +
+      '<div class="grp"><p class="mono">Icons</p><p class="hint" style="margin:0 0 8px">Beside app names on Home (Names view) · Tinted also recolors the icon grid</p><div class="seg3"><button class="btn sm" data-icons="off">Off</button><button class="btn sm" data-icons="color">App colors</button><button class="btn sm" data-icons="tint">Tinted</button></div>' +
         '<p class="hint" style="margin:14px 0 8px">Beside folder names · hold a folder → Icon to pick its own</p><div class="seg3"><button class="btn sm" data-ficons="off">Off</button><button class="btn sm" data-ficons="filled">Filled</button><button class="btn sm" data-ficons="line">Line</button></div></div>' +
       '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div>' +
       '<p class="mono" style="margin:18px 0 8px">Weather</p><div class="wxseg">' + WX.map(([k, n]) => '<button class="btn sm" data-wx="' + k + '">' + n + '</button>').join('') + '</div><p class="hint" id="wxLine" style="margin:8px 0 0"></p></div>' +
@@ -377,7 +379,7 @@
     const c = themeColor(), t = sunTimes(new Date());
     document.querySelectorAll('#sbody [data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === c.id));
     document.querySelectorAll('#sbody [data-str]').forEach((b) => b.classList.toggle('on', b.dataset.str === S.theme.str));
-    [['layout', 'paper'], ['icons', 'off'], ['ficons', 'off']].forEach(([k, d]) => document.querySelectorAll('#sbody [data-' + k + ']').forEach((b) => b.classList.toggle('on', b.dataset[k] === (S.theme[k] || d))));
+    [['view', 'grid'], ['layout', 'paper'], ['icons', 'off'], ['ficons', 'off']].forEach(([k, d]) => document.querySelectorAll('#sbody [data-' + k + ']').forEach((b) => b.classList.toggle('on', b.dataset[k] === (S.theme[k] || d))));
     document.querySelectorAll('#sbody [data-font]').forEach((b) => b.classList.toggle('on', b.dataset.font === (S.theme.font || 'paper')));
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');
     $('#patGrid').querySelectorAll('.swp').forEach((el, i) => { const id = PATS[i][0], t = patCache[id] || (PATS[i][2] && (patCache[id] = PATS[i][2]())); el.style.backgroundColor = c.bg; el.style.backgroundImage = patURL(id, c.ink, c.acc, 0.6) || 'none'; if (t && t.w > 110) el.style.backgroundSize = Math.round(t.w * 0.5) + 'px'; });

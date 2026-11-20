@@ -375,3 +375,30 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
   .calhead h1{font-size:32px;white-space:nowrap}
   .calhead .mono{white-space:nowrap}
 }
+
+/* icon view (0.9.0): Home is a bare grid of icons, folder tiles preview their icons, an open folder shows big icons */
+#app.gridview .cols{display:flex;flex-direction:column;column-gap:0;margin-top:44px}
+#app.gridview .col>.mono{display:none}
+#app.gridview #colPeople,#app.gridview #colThings{display:grid;grid-template-columns:repeat(4,64px);justify-content:space-between;row-gap:22px}
+#app.gridview .col+.col{margin-top:24px;padding-top:24px;border-top:1px solid rgba(var(--inkRGB),.12)}
+.gi .fic{width:64px;height:64px;border-radius:18px}
+.gi .fic b{font-size:26px}
+.gi .fil{display:none}
+.gi.missing .fic{opacity:.35}
+.gi.tint img,.tmini.tint img{filter:url(#duo)}
+.gi.tint .fic,.tmini.tint .fic{background:rgba(var(--inkRGB),.1)}
+#liftItem.fi .fil{display:block;margin:2px 0 0;padding:5px 10px;width:auto;max-width:150px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:12.5px}
+#app.ledger #colPeople .gi,#app.ledger #colThings .gi{min-height:0}
+.tile.tg{min-height:0;padding:12px;gap:12px;justify-content:flex-start}
+.tmini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.tmini .fic{width:auto;height:auto;aspect-ratio:1;border-radius:9px;box-shadow:0 0 0 .5px rgba(var(--inkRGB),.12)}
+.tmini .fic b{font-size:12px}
+.tm{aspect-ratio:1;border-radius:9px;background:rgba(var(--inkRGB),.05)}
+.tm.more{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink2);background:rgba(var(--inkRGB),.08)}
+.tname.tgn{display:flex;align-items:center;gap:8px;padding:0 2px;font-weight:400;font-size:calc(17px * var(--fs,1));letter-spacing:-.3px;min-width:0}
+.tgn>span:not(.ficon):not(.tc){flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tgn .tc{font-size:11px;color:var(--ink2);letter-spacing:0}
+#app.gridview .ficons{grid-template-columns:repeat(3,78px);gap:24px 0}
+#app.gridview .ficons .fic{width:78px;height:78px;border-radius:22px}
+#app.gridview .ficons .fic b{font-size:30px}
+#app.gridview .ficons .fil{width:96px;margin:0 -9px}

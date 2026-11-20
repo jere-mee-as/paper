@@ -8,7 +8,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.8.0';
+  const PAGE_VERSION = '0.9.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -33,7 +33,7 @@
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off' }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid' }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -448,9 +448,10 @@
     }
     const menu = $('#liftMenu');
     menu.innerHTML = items.map((m) => '<button role="menuitem" class="mi' + (m.red ? ' red' : '') + '" data-lift="' + m.id + '"><span>' + esc(m.label) + '</span>' + (m.note ? '<span class="mn">' + esc(m.note) + '</span>' : '') + '</button>').join('');
-    const below = r.bottom + 12 + items.length * 50 < H() - 20;
+    const nameGap = el.classList.contains('gi') ? 34 : 0;   // a grid icon's name shows under it once lifted
+    const below = r.bottom + nameGap + 12 + items.length * 50 < H() - 20;
     menu.style.left = Math.max(14, Math.min(W() - 264, r.left - 14)) + 'px';
-    if (below) { menu.style.top = (r.bottom + 14) + 'px'; menu.style.transformOrigin = '20% 0'; }
+    if (below) { menu.style.top = (r.bottom + nameGap + 14) + 'px'; menu.style.transformOrigin = '20% 0'; }
     else { menu.style.top = Math.max(14, r.top - 14 - items.length * 50) + 'px'; menu.style.transformOrigin = '20% 100%'; }
     liftMenuItems = items;
     box.classList.add('on'); document.body.classList.add('held');
@@ -526,12 +527,18 @@
   }
   function appBtn(h, where) {
     const ok = h.key && byKey.has(h.key);
+    if (S.theme.view === 'grid') {
+      // icon view: the icon alone; holding it lifts it with its name underneath
+      return '<button class="fi gi' + (ok ? '' : ' missing') + (S.theme.icons === 'tint' ? ' tint' : '') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '" aria-label="' + esc(h.name) + '">' +
+        appIcon(byKey.get(h.key) || { label: h.name }) + '<span class="fil">' + esc(h.name) + '</span></button>';
+    }
     return '<button class="app' + (ok ? '' : ' missing') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '">' + homeIcon(h.key) + '<span class="an">' + esc(h.name) + '</span></button>';
   }
   function renderHome() {
     renderClock();
     const jere = S.jere;
-    $('#app').classList.toggle('withicons', S.theme.icons === 'color' || S.theme.icons === 'tint');
+    $('#app').classList.toggle('withicons', S.theme.view !== 'grid' && (S.theme.icons === 'color' || S.theme.icons === 'tint'));
+    $('#app').classList.toggle('gridview', S.theme.view === 'grid');
     $('#cols').hidden = !jere;
     $('#plainList').hidden = jere;
     if (jere) {
@@ -614,6 +621,20 @@
       return;
     }
     box.className = 'tiles scroll';
+    if (S.theme.view === 'grid') {
+      // icon view: each tile previews what's inside (up to 8 icons; a full folder ends on +N)
+      box.innerHTML = list.map((f, i) => {
+        const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
+        const shown = apps.length > 8 ? apps.slice(0, 7) : apps;
+        const cells = shown.map(appIcon);
+        if (apps.length > 8) cells.push('<span class="tm more">+' + (apps.length - 7) + '</span>');
+        while (cells.length < 8) cells.push('<span class="tm"></span>');
+        return '<button class="tile tg" data-tile="' + i + '" data-label="' + esc(f.name) + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '">' +
+          '<span class="tmini' + (S.theme.icons === 'tint' ? ' tint' : '') + '">' + cells.join('') + '</span>' +
+          '<span class="tname tgn" data-label="' + esc(f.name) + '">' + folderIcon(f, 20) + '<span>' + esc(f.name) + '</span><span class="mono tc">' + String(apps.length).padStart(2, '0') + '</span></span></button>';
+      }).join('');
+      return;
+    }
     box.innerHTML = list.map((f, i) => {
       const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
       const more = apps.length - 3;
@@ -675,6 +696,8 @@
     ['Settings', 'Paper', () => openSettings()],
     ['Update Paper', 'Paper', () => { openSettings(); checkUpdates(); }],
     ['Edit home apps', 'Paper', () => openHomeEditor()],
+    ['Icon view', 'Look', () => setTheme({ view: 'grid' })],
+    ['Name view', 'Look', () => setTheme({ view: 'list' })],
     ['Fun stuff', 'Hidden', () => openFun()],
     ['Themes', 'Hidden', () => openThemes()],
     ['Phone notifications', 'Phone', () => call('shade')],
@@ -1010,6 +1033,7 @@
     if (d.str) { setTheme({ str: d.str }); return; }
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
     if (d.font) { setTheme({ font: d.font }); return; }
+    if (d.view) { setTheme({ view: d.view }); return; }
     if (d.layout) { setTheme({ layout: d.layout }); renderHome(); return; }
     if (d.icons) { setTheme({ icons: d.icons }); renderHome(); return; }
     if (d.ficons) { setTheme({ ficons: d.ficons }); renderFolders(); return; }

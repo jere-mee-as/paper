@@ -385,6 +385,33 @@ h1{margin:0;font-weight:300;font-size:42px;line-height:1.05;letter-spacing:-1.6p
   .calhead h1{font-size:32px;white-space:nowrap}
   .calhead .mono{white-space:nowrap}
 }
+
+/* icon view (0.9.0): Home is a bare grid of icons, folder tiles preview their icons, an open folder shows big icons */
+#app.gridview .cols{display:flex;flex-direction:column;column-gap:0;margin-top:44px}
+#app.gridview .col>.mono{display:none}
+#app.gridview #colPeople,#app.gridview #colThings{display:grid;grid-template-columns:repeat(4,64px);justify-content:space-between;row-gap:22px}
+#app.gridview .col+.col{margin-top:24px;padding-top:24px;border-top:1px solid rgba(var(--inkRGB),.12)}
+.gi .fic{width:64px;height:64px;border-radius:18px}
+.gi .fic b{font-size:26px}
+.gi .fil{display:none}
+.gi.missing .fic{opacity:.35}
+.gi.tint img,.tmini.tint img{filter:url(#duo)}
+.gi.tint .fic,.tmini.tint .fic{background:rgba(var(--inkRGB),.1)}
+#liftItem.fi .fil{display:block;margin:2px 0 0;padding:5px 10px;width:auto;max-width:150px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:12.5px}
+#app.ledger #colPeople .gi,#app.ledger #colThings .gi{min-height:0}
+.tile.tg{min-height:0;padding:12px;gap:12px;justify-content:flex-start}
+.tmini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.tmini .fic{width:auto;height:auto;aspect-ratio:1;border-radius:9px;box-shadow:0 0 0 .5px rgba(var(--inkRGB),.12)}
+.tmini .fic b{font-size:12px}
+.tm{aspect-ratio:1;border-radius:9px;background:rgba(var(--inkRGB),.05)}
+.tm.more{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink2);background:rgba(var(--inkRGB),.08)}
+.tname.tgn{display:flex;align-items:center;gap:8px;padding:0 2px;font-weight:400;font-size:calc(17px * var(--fs,1));letter-spacing:-.3px;min-width:0}
+.tgn>span:not(.ficon):not(.tc){flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tgn .tc{font-size:11px;color:var(--ink2);letter-spacing:0}
+#app.gridview .ficons{grid-template-columns:repeat(3,78px);gap:24px 0}
+#app.gridview .ficons .fic{width:78px;height:78px;border-radius:22px}
+#app.gridview .ficons .fic b{font-size:30px}
+#app.gridview .ficons .fil{width:96px;margin:0 -9px}
 </style>
 </head>
 <body>
@@ -540,7 +567,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const J = (s, d) => { try { const v = typeof s === 'string' ? JSON.parse(s) : s; return v == null ? d : v; } catch (e) { return d; } };
   const call = (fn, ...a) => { try { return N[fn](...a); } catch (e) { console.warn('PaperNative.' + fn, e); return null; } };
-  const PAGE_VERSION = '0.8.0';
+  const PAGE_VERSION = '0.9.0';
 
   // ------------------------------------------------------------------ saved state
   const KEY = 'paper.v1';
@@ -565,7 +592,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
       folders: null, open: 'Finance', torch: false, dnd: false };
   }
 
-  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off' }, S.theme || {});
+  S.theme = Object.assign({ color: 'paper', pat: 'none', str: 'soft', auto: false, wx: 'clear', font: 'paper', layout: 'paper', icons: 'off', ficons: 'off', view: 'grid' }, S.theme || {});
 
   // ------------------------------------------------------------------ apps
   let APPS = [];
@@ -980,9 +1007,10 @@ if (!window.PaperNative) window.PaperNative = (function () {
     }
     const menu = $('#liftMenu');
     menu.innerHTML = items.map((m) => '<button role="menuitem" class="mi' + (m.red ? ' red' : '') + '" data-lift="' + m.id + '"><span>' + esc(m.label) + '</span>' + (m.note ? '<span class="mn">' + esc(m.note) + '</span>' : '') + '</button>').join('');
-    const below = r.bottom + 12 + items.length * 50 < H() - 20;
+    const nameGap = el.classList.contains('gi') ? 34 : 0;   // a grid icon's name shows under it once lifted
+    const below = r.bottom + nameGap + 12 + items.length * 50 < H() - 20;
     menu.style.left = Math.max(14, Math.min(W() - 264, r.left - 14)) + 'px';
-    if (below) { menu.style.top = (r.bottom + 14) + 'px'; menu.style.transformOrigin = '20% 0'; }
+    if (below) { menu.style.top = (r.bottom + nameGap + 14) + 'px'; menu.style.transformOrigin = '20% 0'; }
     else { menu.style.top = Math.max(14, r.top - 14 - items.length * 50) + 'px'; menu.style.transformOrigin = '20% 100%'; }
     liftMenuItems = items;
     box.classList.add('on'); document.body.classList.add('held');
@@ -1058,12 +1086,18 @@ if (!window.PaperNative) window.PaperNative = (function () {
   }
   function appBtn(h, where) {
     const ok = h.key && byKey.has(h.key);
+    if (S.theme.view === 'grid') {
+      // icon view: the icon alone; holding it lifts it with its name underneath
+      return '<button class="fi gi' + (ok ? '' : ' missing') + (S.theme.icons === 'tint' ? ' tint' : '') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '" aria-label="' + esc(h.name) + '">' +
+        appIcon(byKey.get(h.key) || { label: h.name }) + '<span class="fil">' + esc(h.name) + '</span></button>';
+    }
     return '<button class="app' + (ok ? '' : ' missing') + '" data-open="' + esc(h.key) + '" data-label="' + esc(h.name) + '" data-hold="' + esc(where) + '" data-key="' + esc(h.key) + '">' + homeIcon(h.key) + '<span class="an">' + esc(h.name) + '</span></button>';
   }
   function renderHome() {
     renderClock();
     const jere = S.jere;
-    $('#app').classList.toggle('withicons', S.theme.icons === 'color' || S.theme.icons === 'tint');
+    $('#app').classList.toggle('withicons', S.theme.view !== 'grid' && (S.theme.icons === 'color' || S.theme.icons === 'tint'));
+    $('#app').classList.toggle('gridview', S.theme.view === 'grid');
     $('#cols').hidden = !jere;
     $('#plainList').hidden = jere;
     if (jere) {
@@ -1146,6 +1180,20 @@ if (!window.PaperNative) window.PaperNative = (function () {
       return;
     }
     box.className = 'tiles scroll';
+    if (S.theme.view === 'grid') {
+      // icon view: each tile previews what's inside (up to 8 icons; a full folder ends on +N)
+      box.innerHTML = list.map((f, i) => {
+        const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
+        const shown = apps.length > 8 ? apps.slice(0, 7) : apps;
+        const cells = shown.map(appIcon);
+        if (apps.length > 8) cells.push('<span class="tm more">+' + (apps.length - 7) + '</span>');
+        while (cells.length < 8) cells.push('<span class="tm"></span>');
+        return '<button class="tile tg" data-tile="' + i + '" data-label="' + esc(f.name) + '" data-hold="' + (f.auto ? '' : 'folder:' + i) + '">' +
+          '<span class="tmini' + (S.theme.icons === 'tint' ? ' tint' : '') + '">' + cells.join('') + '</span>' +
+          '<span class="tname tgn" data-label="' + esc(f.name) + '">' + folderIcon(f, 20) + '<span>' + esc(f.name) + '</span><span class="mono tc">' + String(apps.length).padStart(2, '0') + '</span></span></button>';
+      }).join('');
+      return;
+    }
     box.innerHTML = list.map((f, i) => {
       const apps = f.keys.map((k) => byKey.get(k)).filter(Boolean);
       const more = apps.length - 3;
@@ -1207,6 +1255,8 @@ if (!window.PaperNative) window.PaperNative = (function () {
     ['Settings', 'Paper', () => openSettings()],
     ['Update Paper', 'Paper', () => { openSettings(); checkUpdates(); }],
     ['Edit home apps', 'Paper', () => openHomeEditor()],
+    ['Icon view', 'Look', () => setTheme({ view: 'grid' })],
+    ['Name view', 'Look', () => setTheme({ view: 'list' })],
     ['Fun stuff', 'Hidden', () => openFun()],
     ['Themes', 'Hidden', () => openThemes()],
     ['Phone notifications', 'Phone', () => call('shade')],
@@ -1542,6 +1592,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     if (d.str) { setTheme({ str: d.str }); return; }
     if (d.set !== undefined) { const z = SETS[+d.set]; setTheme({ color: z[1], pat: z[2], str: z[3], auto: false, font: z[4] || 'paper' }); return; }
     if (d.font) { setTheme({ font: d.font }); return; }
+    if (d.view) { setTheme({ view: d.view }); return; }
     if (d.layout) { setTheme({ layout: d.layout }); renderHome(); return; }
     if (d.icons) { setTheme({ icons: d.icons }); renderHome(); return; }
     if (d.ficons) { setTheme({ ficons: d.ficons }); renderFolders(); return; }
@@ -1980,7 +2031,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     st.setProperty('--fs', String(FS[f[0]] || 1));
     document.documentElement.dataset.font = f[0];
   }
-  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
+  function setTheme(patch) { const wxOnly = Object.keys(patch).every((k) => k === 'wx'); Object.assign(S.theme, patch); save(); if (!wxOnly) applyTheme(true); applyWeather(); if ('view' in patch || 'layout' in patch || 'icons' in patch || 'ficons' in patch || 'font' in patch) { renderHome(); renderFolders(); } markThemes(); haptic('tick'); }
   function sunTick() { if (S.theme.auto && sunPhase(Date.now()) !== lastPhase) { applyTheme(true); markThemes(); } if (S.theme.wx === 'real') applyWeather(); }
 
   // ---- the Themes folder
@@ -1992,9 +2043,11 @@ if (!window.PaperNative) window.PaperNative = (function () {
     FONTS.forEach(loadFont);   // so the font tiles show themselves
     sheetKind = 'themes';
     openSheet('<h2>Themes</h2><div class="btnrow"><button class="btn solid" data-thact="surprise">Surprise me</button><button class="btn" data-thact="reset">Back to Paper</button></div>' +
+      '<div class="grp"><p class="mono">View</p><div class="seg"><button class="btn sm" data-view="grid">Icons</button><button class="btn sm" data-view="list">Names</button></div>' +
+        '<p class="hint" style="margin:8px 0 0">Icons: Home is a grid of icons (hold one for its name), folder tiles preview what\'s inside, an open folder shows big icons. Names: the lists.</p></div>' +
       '<div class="grp"><p class="mono">Layout</p><div class="seg"><button class="btn sm" data-layout="paper">Paper</button><button class="btn sm" data-layout="shell">SHELL</button></div>' +
         '<p class="hint" style="margin:8px 0 0">SHELL: everything in JetBrains Mono, a ledger of today on the left, the time stacked thin on the right. Works with any color.</p></div>' +
-      '<div class="grp"><p class="mono">Icons</p><p class="hint" style="margin:0 0 8px">Beside app names on Home</p><div class="seg3"><button class="btn sm" data-icons="off">Off</button><button class="btn sm" data-icons="color">App colors</button><button class="btn sm" data-icons="tint">Tinted</button></div>' +
+      '<div class="grp"><p class="mono">Icons</p><p class="hint" style="margin:0 0 8px">Beside app names on Home (Names view) · Tinted also recolors the icon grid</p><div class="seg3"><button class="btn sm" data-icons="off">Off</button><button class="btn sm" data-icons="color">App colors</button><button class="btn sm" data-icons="tint">Tinted</button></div>' +
         '<p class="hint" style="margin:14px 0 8px">Beside folder names · hold a folder → Icon to pick its own</p><div class="seg3"><button class="btn sm" data-ficons="off">Off</button><button class="btn sm" data-ficons="filled">Filled</button><button class="btn sm" data-ficons="line">Line</button></div></div>' +
       '<div class="grp"><p class="mono">Follow the sun</p><div class="kv"><span class="k" id="sunLine" style="font-size:15px"></span><button class="btn sm" data-thact="auto" id="sunBtn"></button></div><div class="swg" style="margin-top:12px">' + TH.filter((c) => c.g === 'sun').map(swatch).join('') + '</div>' +
       '<p class="mono" style="margin:18px 0 8px">Weather</p><div class="wxseg">' + WX.map(([k, n]) => '<button class="btn sm" data-wx="' + k + '">' + n + '</button>').join('') + '</div><p class="hint" id="wxLine" style="margin:8px 0 0"></p></div>' +
@@ -2014,7 +2067,7 @@ if (!window.PaperNative) window.PaperNative = (function () {
     const c = themeColor(), t = sunTimes(new Date());
     document.querySelectorAll('#sbody [data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === c.id));
     document.querySelectorAll('#sbody [data-str]').forEach((b) => b.classList.toggle('on', b.dataset.str === S.theme.str));
-    [['layout', 'paper'], ['icons', 'off'], ['ficons', 'off']].forEach(([k, d]) => document.querySelectorAll('#sbody [data-' + k + ']').forEach((b) => b.classList.toggle('on', b.dataset[k] === (S.theme[k] || d))));
+    [['view', 'grid'], ['layout', 'paper'], ['icons', 'off'], ['ficons', 'off']].forEach(([k, d]) => document.querySelectorAll('#sbody [data-' + k + ']').forEach((b) => b.classList.toggle('on', b.dataset[k] === (S.theme[k] || d))));
     document.querySelectorAll('#sbody [data-font]').forEach((b) => b.classList.toggle('on', b.dataset.font === (S.theme.font || 'paper')));
     $('#patGrid').innerHTML = PATS.map((p) => '<button class="sw' + (p[0] === S.theme.pat ? ' on' : '') + '" data-pat="' + p[0] + '"><span class="swp"></span><span class="swn">' + p[1] + '</span></button>').join('');
     $('#patGrid').querySelectorAll('.swp').forEach((el, i) => { const id = PATS[i][0], t = patCache[id] || (PATS[i][2] && (patCache[id] = PATS[i][2]())); el.style.backgroundColor = c.bg; el.style.backgroundImage = patURL(id, c.ink, c.acc, 0.6) || 'none'; if (t && t.w > 110) el.style.backgroundSize = Math.round(t.w * 0.5) + 'px'; });

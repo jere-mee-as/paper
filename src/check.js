@@ -33,7 +33,10 @@ const path = require('path');
   const near = (a, b) => Math.abs(a - b) < 0.01;
   async function tapEl(sel) { const b = await (await p.$(sel)).boundingBox(); await touch('touchStart', b.x + b.width / 2, b.y + b.height / 2); await wait(40); await touch('touchEnd'); await wait(60); }
 
-  await wait(800); await shot('01-home');
+  await wait(800);
+  expect((await st()).theme.view === 'grid', 'icon view is the default'); await shot('00-grid-default');
+  await p.evaluate(() => PAPER.setTheme({ view: 'list' })); await wait(300);   // the older checks below run on the name lists
+  await shot('01-home');
   await swipe(60, 450, 300, 450); expect(near((await st()).hx, -1), 'swipe right → calendar'); await shot('02-calendar');
   await swipe(300, 450, 240, 450, 500, 12); expect(near((await st()).hx, -1), 'short slow drag springs back');
   await swipe(320, 450, 260, 450, 50, 4); expect(near((await st()).hx, 0), 'short flick → home');
@@ -272,6 +275,34 @@ const path = require('path');
   await swipe(60, 450, 330, 450); await settle(); await shot('51-shell-home-color-icons');
   await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', ficons: 'off', icons: 'off', font: 'paper' })); await p.evaluate(() => PAPER.onNative('resume', null)); await wait(400);
   expect(!(await p.$('#app.ledger')) && !(await p.$('#cols .hic')), 'back to Paper defaults');
+  // icon view (0.9.0): H3 home grid, F1 tile previews, F3 big icons in an open folder
+  await p.evaluate(() => PAPER.setTheme({ view: 'grid' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(400); await shot('52-grid-home');
+  const gh = await p.evaluate(() => { const g = [...document.querySelectorAll('#cols .gi')]; return { n: g.length, named: g.filter((x) => x.querySelector('.fil').offsetWidth > 0).length, tops: g.slice(0, 5).map((x) => Math.round(x.getBoundingClientRect().top)), right: Math.max(...g.map((x) => x.getBoundingClientRect().right)), rail: document.querySelector('#rail').getBoundingClientRect().left, withicons: document.querySelector('#app').classList.contains('withicons') }; });
+  expect(gh.n === 14 && gh.named === 0, 'home is 14 bare icons ' + JSON.stringify(gh));
+  expect(gh.tops[0] === gh.tops[3] && gh.tops[4] > gh.tops[3], 'four icons per row ' + gh.tops);
+  expect(gh.right <= gh.rail + 4, 'icons stay clear of the A–Z rail ' + gh.right + ' / ' + gh.rail);
+  const gi = await (await p.$('#colPeople .gi')).boundingBox(); await touch('touchStart', gi.x + 30, gi.y + 30); await wait(620); await touch('touchEnd'); await wait(450);
+  const ln = await p.evaluate(() => { const f = document.querySelector('#liftItem .fil'); return f && f.offsetWidth > 0 ? f.textContent : ''; });
+  expect(!!ln, 'holding an icon shows its name (' + ln + ')'); await shot('53-grid-hold');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle(); await wait(200);
+  const nL = await p.evaluate(() => __launched.length); await tapEl('#colThings .gi'); await wait(200);
+  expect((await p.evaluate(() => __launched.length)) === nL + 1, 'tapping an icon opens the app');
+  await p.evaluate(() => PAPER.onNative('home', null)); await settle();
+  await swipe(330, 450, 60, 450); await wait(300); await shot('54-grid-folders');
+  const tg = await p.evaluate(() => ({ tiles: document.querySelectorAll('#tiles .tile.tg').length, cells: [...document.querySelectorAll('#tiles .tmini')].map((m) => m.children.length), cut: [...document.querySelectorAll('#tiles .tgn>span:not(.tc)')].filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent) }));
+  expect(tg.tiles >= 8 && tg.cells.every((n) => n === 8) && !tg.cut.length, 'folder tiles preview 8 cells and names fit ' + JSON.stringify(tg));
+  await tapEl('[data-tile="1"]'); await settle(); await wait(300); await shot('55-grid-folder-open');
+  const cols = await p.evaluate(() => getComputedStyle(document.querySelector('#fview .ficons')).gridTemplateColumns.split(' ').length);
+  const big = await p.evaluate(() => document.querySelector('#fview .fi .fic').getBoundingClientRect().width);
+  expect(cols === 3 && Math.round(big) === 78, 'open folder: 3 columns of 78 px icons (' + cols + ', ' + big + ')');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  const tb = await (await p.$('[data-tile="0"]')).boundingBox(); await touch('touchStart', tb.x + 40, tb.y + 40); await wait(620); await touch('touchEnd'); await wait(450);
+  const tl = await p.evaluate(() => document.querySelector('#liftItem').textContent.trim()); expect(tl.length > 0 && !/\d/.test(tl), 'a held tile lifts as its name (' + tl + ')');
+  await p.evaluate(() => PAPER.onNative('back', null)); await settle();
+  await p.evaluate(() => PAPER.setTheme({ color: 's-ember', layout: 'shell', icons: 'tint', ficons: 'filled' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle(); await wait(500); await shot('56-grid-shell-tint');
+  expect((await p.$$('#cols .gi.tint')).length === 14, 'Tinted recolors the grid');
+  await swipe(330, 450, 60, 450); await wait(300); await shot('57-grid-shell-folders');
+  await p.evaluate(() => PAPER.setTheme({ color: 'paper', layout: 'paper', icons: 'off', ficons: 'off' })); await p.evaluate(() => PAPER.onNative('home', null)); await settle();
   // weather
   await p.evaluate(() => PAPER.setTheme({ color: 'sun-night', pat: 'none', wx: 'rain' })); await wait(700);
   let wx = await p.evaluate(() => PAPER.weather()); expect(wx.kind === 'rain' && wx.running && wx.drops > 20, 'rain falls ' + JSON.stringify(wx)); await shot('25-weather-rain-night');
